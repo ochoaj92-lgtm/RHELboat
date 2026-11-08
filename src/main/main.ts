@@ -1,149 +1,121 @@
-import { app, BrowserWindow, ipcMain, session, dialog } from "electron";
-import { join } from "path";
-import { initialize, enable } from "@electron/remote/main/index.js";
-import Store from "electron-store";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ContainerLab } from "./lab.js";
+import { InstallationVM } from "./installation-vm.js";
+import type { VMOptions } from "../shared/installation.js";
 
-initialize();
-
-// Window Constants
-const WINDOW_MIN_WIDTH = 1280;
-const WINDOW_MIN_HEIGHT = 800;
-
-// For electron-store Type-Safety
-type SchemaType = {
-    dimensions: {
-        width: number;
-        height: number;
-    };
-    position: {
-        x: number;
-        y: number;
-    };
-};
-
-const windowStore = new Store<SchemaType>({
-    schema: {
-        dimensions: {
-            type: "object",
-            properties: {
-                width: {
-                    type: "number",
-                    default: WINDOW_MIN_WIDTH,
-                },
-                height: {
-                    type: "number",
-                    default: WINDOW_MIN_HEIGHT,
-                },
-            },
-            required: ["width", "height"],
-        },
-        position: {
-            type: "object",
-            properties: {
-                x: {
-                    type: "number",
-                },
-                y: {
-                    type: "number",
-                },
-            },
-            required: ["x", "y"],
-        },
-    },
-});
-
+app.setName("RHELboat");
+if (process.platform === "linux") app.setDesktopName("rhelboat.desktop");
 let mainWindow: BrowserWindow | null = null;
+let lab: ContainerLab;
+let closing = false;
+const developmentUrl = "http://localhost:8080";
 
 function createWindow() {
-    if (!app.requestSingleInstanceLock()) {
-        // @ts-ignore property "window" is optional, see: [dialog.showMessageBoxSync](https://www.electronjs.org/docs/latest/api/dialog#dialogshowmessageboxsyncwindow-options)
-        dialog.showMessageBoxSync(null, {
-            type: "error",
-            buttons: ["Close"],
-            title: "WinBoat",
-            message: "An instance of WinBoat is already running.\n\tMultiple Instances are not allowed.",
-        });
-        app.exit();
-    }
-
     mainWindow = new BrowserWindow({
-        minWidth: WINDOW_MIN_WIDTH,
-        minHeight: WINDOW_MIN_HEIGHT,
-        width: windowStore.get("dimensions.width"),
-        height: windowStore.get("dimensions.height"),
-        x: windowStore.get("position.x"),
-        y: windowStore.get("position.y"),
-        transparent: false,
-        frame: false,
+        title: "RHELboat · Enterprise Linux Training Lab",
+        icon: app.isPackaged
+            ? join(app.getAppPath(), "renderer", "img", "rhelboat.png")
+            : join(dirname(fileURLToPath(import.meta.url)), "../../src/renderer/public/img/rhelboat.png"),
+        width: 1480,
+        height: 940,
+        minWidth: 1000,
+        minHeight: 700,
+        backgroundColor: "#f6f3ed",
+        autoHideMenuBar: true,
         webPreferences: {
-            // preload: join(__dirname, 'preload.js'),
-            nodeIntegration: true,
-            contextIsolation: false,
+            preload: join(dirname(fileURLToPath(import.meta.url)), "preload.cjs"),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
         },
     });
-
-    mainWindow.on("close", () => {
-        const bounds = mainWindow?.getBounds();
-
-        windowStore.set("dimensions", {
-            width: bounds?.width,
-            height: bounds?.height,
-        });
-
-        windowStore.set("position", {
-            x: bounds?.x,
-            y: bounds?.y,
-        });
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    mainWindow.webContents.on("will-navigate", event => event.preventDefault());
+    mainWindow.on("close", event => {
+        if (!closing) {
+            event.preventDefault();
+            closing = true;
+            void lab.stop().finally(() => app.quit());
+        }
     });
-
-    enable(mainWindow.webContents);
-
-    if (process.env.NODE_ENV === "development") {
-        const rendererPort = process.argv[2];
-        mainWindow.loadURL(`http://localhost:${rendererPort}`);
+    if (!app.isPackaged && process.env.NODE_ENV === "development") {
+        void mainWindow.loadURL(developmentUrl);
     } else {
-        mainWindow.loadFile(join(app.getAppPath(), "renderer", "index.html"));
+        void mainWindow.loadFile(join(app.getAppPath(), "renderer", "index.html"));
     }
 }
 
-app.whenReady().then(() => {
-    createWindow();
-
-    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-        callback({
-            responseHeaders: {
-                ...details.responseHeaders,
-                // 'Content-Security-Policy': ['script-src \'self\'']
-                "Content-Security-Policy": [
-                    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline'",
-                    "worker-src 'self' blob:",
-                    "media-src 'self' blob:",
-                    "font-src 'self' 'unsafe-inline' https://fonts.gstatic.com;",
-                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-                ],
-            },
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+} else {
+    app.whenReady().then(() => {
+        const contextDir = app.isPackaged
+            ? join(process.resourcesPath, "labs")
+            : join(dirname(fileURLToPath(import.meta.url)), "../../labs");
+        lab = new ContainerLab(contextDir, output => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("lab:output", output);
         });
+        const installation = new InstallationVM(join(app.getPath("userData"), "installation-vm"));
+        const handlers = {
+            "installation:capabilities": () => installation.capabilities(),
+            "installation:status": () => installation.status(),
+            "installation:select-iso": async () => {
+                const selection = await dialog.showOpenDialog(mainWindow!, {
+                    title: "Select the RHEL ISO you downloaded from Red Hat",
+                    properties: ["openFile"],
+                    filters: [{ name: "ISO installation media", extensions: ["iso"] }],
+                });
+                if (selection.canceled || !selection.filePaths[0]) return null;
+                return installation.selectISO(selection.filePaths[0]);
+            },
+            "installation:start": (options: unknown) => installation.start(options as VMOptions),
+            "installation:shutdown": () => installation.shutdown(),
+            "lab:status": (runtime: unknown) => lab.status(runtime as "podman" | "docker"),
+            "lab:start": (runtime: unknown) => lab.start(runtime as "podman" | "docker"),
+            "lab:write": (input: unknown) => lab.write(input as string),
+            "lab:check": (id: unknown) => lab.check(id as string),
+            "lab:reset": (runtime: unknown) => lab.reset(runtime as "podman" | "docker"),
+            "lab:stop": () => lab.stop(),
+            "trainer:open-source": (url: unknown) => {
+                if (typeof url !== "string") throw new Error("Invalid source URL");
+                const parsed = new URL(url);
+                if (
+                    parsed.protocol !== "https:" ||
+                    !["www.redhat.com", "access.redhat.com", "docs.redhat.com", "developers.redhat.com"].includes(
+                        parsed.hostname,
+                    )
+                ) {
+                    throw new Error("Only official Red Hat sources may be opened");
+                }
+                return shell.openExternal(parsed.href);
+            },
+        };
+        for (const [channel, handler] of Object.entries(handlers)) {
+            ipcMain.handle(channel, (event, value) => {
+                if (
+                    !mainWindow ||
+                    event.sender !== mainWindow.webContents ||
+                    event.senderFrame !== mainWindow.webContents.mainFrame
+                ) {
+                    throw new Error("Untrusted sender");
+                }
+                return handler(value);
+            });
+        }
+        createWindow();
     });
-
-    app.on("activate", function () {
-        // On macOS it's common to re-create a window in the app when the
-        // dock icon is clicked and there are no other windows open.
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
+    app.on("second-instance", () => {
+        if (mainWindow?.isMinimized()) mainWindow.restore();
+        mainWindow?.focus();
+    });
+    app.on("window-all-closed", () => app.quit());
+    app.on("before-quit", event => {
+        if (lab && !closing) {
+            event.preventDefault();
+            closing = true;
+            void lab.stop().finally(() => app.quit());
         }
     });
-});
-
-app.on("window-all-closed", function () {
-    if (process.platform !== "darwin") app.quit();
-});
-
-app.on("second-instance", _ => {
-    if (mainWindow) {
-        mainWindow.focus();
-    }
-});
-
-ipcMain.on("message", (_event, message) => {
-    console.log(message);
-});
+}

@@ -1,6 +1,7 @@
 {
-    "appId": "com.teabox.winboat",
-    "productName": "WinBoat",
+    "appId": "app.rhelboat.trainer",
+    "productName": "RHELboat",
+    "npmRebuild": false,
     "directories": {
         "output": "dist"
     },
@@ -9,23 +10,32 @@
         "oneClick": false,
         "perMachine": false,
         "allowToChangeInstallationDirectory": true,
-        "shortcutName": "WinBoat"
+        "shortcutName": "RHELboat",
+        "installerIcon": "icons/rhelboat.ico",
+        "uninstallerIcon": "icons/rhelboat.ico",
+        "installerHeaderIcon": "icons/rhelboat.ico",
+        "installerHeader": "icons/installer-header.bmp",
+        "installerSidebar": "icons/installer-sidebar.bmp",
+        "uninstallerSidebar": "icons/installer-sidebar.bmp"
     },
     "win": {
-        "target": "nsis"
+        "target": "nsis",
+        "icon": "icons/rhelboat.ico"
     },
     "linux": {
-        "icon": "icons/winboat_logo.svg",
+        "icon": "icons/png",
         "target": ["appimage", "deb", "rpm", "tar.bz2"],
-        "category": "Utility",
+        "category": "Education",
+        "maintainer": "RHELboat contributors",
         "artifactName": "${name}-${version}-${arch}.${ext}",
         "desktop": {
             "entry": {
-                "Comment[ru]": "Запуск приложений Windows в Linux с бесшовной интеграцией",
-                "Keywords": "windows;vm;virtual machine;virtualization;rdp;freerdp;remoteapp;docker;kvm;apps;",
-                "Keywords[ru]": "windows;vm;rdp;freerdp;docker;kvm;виртуальная машина;виртуализация;приложения windows;программы;"
+                "Comment": "Step-by-step Enterprise Linux practice with local container labs",
+                "Keywords": "linux;training;rhcsa;rhce;certification;podman;docker;"
             }
-        }
+        },
+        "executableName": "rhelboat",
+        "syncDesktopName": true
     },
     "files": [
         {
@@ -38,25 +48,19 @@
             "to": "renderer",
             "filter": ["**/*"]
         },
-        {
-            "from": "src/main/static",
-            "to": "static",
-            "filter": ["**/*"]
-        },
         "!build",
         "!dist",
         "!scripts"
     ],
     "extraResources": [
         {
-            "from": "./guest_server/dist",
-            "to": "guest_server",
-            "filter": ["**/*"]
-        },
-        {
-            "from": "./data",
-            "to": "data",
+            "from": "./labs",
+            "to": "labs",
             "filter": ["**/*"]
         }
-    ]
+    ],
+    "mac": {
+        "icon": "icons/rhelboat.icns",
+        "category": "public.app-category.education"
+    }
 }

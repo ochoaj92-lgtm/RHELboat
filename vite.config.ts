@@ -8,6 +8,7 @@ const config = defineConfig({
     publicDir: "public",
     server: {
         port: 8080,
+        strictPort: true,
     },
     define: {
         "import.meta.env.VITE_APP_VERSION": JSON.stringify(packageJson.version),

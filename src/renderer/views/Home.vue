@@ -5,7 +5,7 @@
         >
             <div class="flex flex-row gap-4 items-center">
                 <div class="border-[0.4rem] border-gray-900/30 rounded-md">
-                    <img class="h-32 rounded-sm" :src="wallpaper" alt="Windows Wallpaper" />
+                    <img class="h-32 rounded-sm" :src="wallpaper" alt="RHELboat training lab" />
                 </div>
 
                 <!-- Status Text -->
@@ -218,9 +218,7 @@ const wallpaper = ref("");
 
 onMounted(async () => {
     compose.value = Winboat.readCompose(winboat.containerMgr!.composeFilePath);
-    wallpaper.value = compose.value?.services.windows.environment.VERSION.includes("11")
-        ? "./img/wallpaper/win11.webp"
-        : "./img/wallpaper/win10.webp";
+    wallpaper.value = "./img/rhelboat.png";
 
     // Highlight the navitem for the home page, since by default no
     // navitem is highlighted and we can't use `toggled`

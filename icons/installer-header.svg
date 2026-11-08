@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="57" viewBox="0 0 150 57">
+  <rect width="150" height="57" fill="#101820"/>
+  <g transform="translate(4 4) scale(.19)">
+    <path d="M120 57v91H54Z" fill="#f6f3ed"/><path d="M140 76v72h57Z" fill="#e53635"/>
+    <path d="M129 49v106" fill="none" stroke="#f6f3ed" stroke-width="7" stroke-linecap="round"/>
+    <path d="M47 163h162l-24 34H72Z" fill="#e53635"/>
+    <path d="m98 173 9 7-9 7m22 0h18" fill="none" stroke="#f6f3ed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M76 212h35m29 0h35" fill="none" stroke="#7ed4bb" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="58" y="28" fill="#f6f3ed" font-size="15" font-weight="700" font-family="DejaVu Sans, sans-serif" letter-spacing="-.6">RHEL<tspan fill="#a4b2b6" font-weight="400">boat</tspan></text>
+  <text x="59" y="40" fill="#819497" font-size="5.7" font-family="DejaVu Sans, sans-serif" letter-spacing=".7">LINUX TRAINING LAB</text>
+</svg>
