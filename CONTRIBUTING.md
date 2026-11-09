@@ -23,7 +23,7 @@ Preserve the lab's host isolation, runtime ownership checks, accessibility, and 
 
 ## Check your work
 
-Use Node.js 24+ and Podman or Docker as described in [README.md](README.md).
+Use Node.js 24+ and Podman or Docker as described in [README.md](README.md). Windows contributor and installer instructions are in [docs/WINDOWS.md](docs/WINDOWS.md). POSIX shell and QEMU fixture tests run on Linux; the Windows job runs the portable tests plus an installed-app smoke check.
 
 ```sh
 npm run typecheck

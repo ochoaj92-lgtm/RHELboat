@@ -94,50 +94,54 @@ test("installation retains stable checkpoints while its references come from wor
     assert.ok(installation.references.some(reference => reference.workbookId === "rhel10"));
 });
 
-test("suggested commands parse as Bash and file labs produce the promised results", () => {
-    for (const lesson of lessons)
-        for (const step of lesson.steps) {
-            if (!step.command) continue;
-            const result = spawnSync("/bin/bash", ["-n", "-c", step.command], { encoding: "utf8" });
-            assert.equal(result.status, 0, `${lesson.id}: ${result.stderr}`);
-        }
-    const directory = mkdtempSync(join(tmpdir(), "rhelboat-curriculum-"));
-    try {
-        const fileLabs = [
-            "navigation",
-            "documentation",
-            "environment",
-            "links",
-            "archive",
-            "text",
-            "find-files",
-            "edit-files",
-            "permissions",
-            "scripting",
-            "shell-loops",
-        ];
-        for (const id of fileLabs)
-            for (const step of lessons.find(item => item.id === id)!.steps) {
+test(
+    "suggested commands parse as Bash and file labs produce the promised results",
+    { skip: process.platform === "win32" },
+    () => {
+        for (const lesson of lessons)
+            for (const step of lesson.steps) {
                 if (!step.command) continue;
-                const result = spawnSync("/bin/bash", ["-c", step.command.replaceAll("/root/lab", directory)], {
-                    encoding: "utf8",
-                });
-                // diff exits 1 when the intended edit is present; the following cat still succeeds.
-                assert.equal(result.status, 0, `${id}: ${result.stderr}`);
+                const result = spawnSync("/bin/bash", ["-n", "-c", step.command], { encoding: "utf8" });
+                assert.equal(result.status, 0, `${lesson.id}: ${result.stderr}`);
             }
-        assert.equal(readFileSync(join(directory, "environment.txt"), "utf8"), "training shell\n");
-        assert.equal(readFileSync(join(directory, "editor.conf"), "utf8"), "MODE=training\nOWNER=trainee\n");
-        assert.equal(
-            readFileSync(join(directory, "found-configs.txt"), "utf8"),
-            `${directory}/search-lab/app.conf\n${directory}/search-lab/nested/db.conf\n`,
-        );
-        assert.equal(statSync(join(directory, "private.txt")).mode & 0o777, 0o600);
-        assert.equal(spawnSync(join(directory, "names.sh"), [], { encoding: "utf8" }).stdout, "alpha\nbeta\n");
-        assert.equal(
-            spawnSync(join(directory, "hello.sh"), [], { encoding: "utf8" }).stdout,
-            "hello enterprise linux\n",
-        );
-    } finally {
-        rmSync(directory, { recursive: true, force: true });
-    }
-});
+        const directory = mkdtempSync(join(tmpdir(), "rhelboat-curriculum-"));
+        try {
+            const fileLabs = [
+                "navigation",
+                "documentation",
+                "environment",
+                "links",
+                "archive",
+                "text",
+                "find-files",
+                "edit-files",
+                "permissions",
+                "scripting",
+                "shell-loops",
+            ];
+            for (const id of fileLabs)
+                for (const step of lessons.find(item => item.id === id)!.steps) {
+                    if (!step.command) continue;
+                    const result = spawnSync("/bin/bash", ["-c", step.command.replaceAll("/root/lab", directory)], {
+                        encoding: "utf8",
+                    });
+                    // diff exits 1 when the intended edit is present; the following cat still succeeds.
+                    assert.equal(result.status, 0, `${id}: ${result.stderr}`);
+                }
+            assert.equal(readFileSync(join(directory, "environment.txt"), "utf8"), "training shell\n");
+            assert.equal(readFileSync(join(directory, "editor.conf"), "utf8"), "MODE=training\nOWNER=trainee\n");
+            assert.equal(
+                readFileSync(join(directory, "found-configs.txt"), "utf8"),
+                `${directory}/search-lab/app.conf\n${directory}/search-lab/nested/db.conf\n`,
+            );
+            assert.equal(statSync(join(directory, "private.txt")).mode & 0o777, 0o600);
+            assert.equal(spawnSync(join(directory, "names.sh"), [], { encoding: "utf8" }).stdout, "alpha\nbeta\n");
+            assert.equal(
+                spawnSync(join(directory, "hello.sh"), [], { encoding: "utf8" }).stdout,
+                "hello enterprise linux\n",
+            );
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
+    },
+);

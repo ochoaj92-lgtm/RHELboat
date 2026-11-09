@@ -32,9 +32,10 @@
             "to": "renderer",
             "filter": ["**/*"]
         },
-        "!build",
-        "!dist",
-        "!scripts"
+        "package.json",
+        "LICENSE",
+        "!**/*.pdf",
+        "!**/.git/**"
     ],
     "extraResources": [
         {
@@ -42,5 +43,36 @@
             "to": "labs",
             "filter": ["**/*"]
         }
-    ]
+    ],
+    "extraMetadata": {
+        "main": "main/main.js"
+    },
+    "win": {
+        "target": [
+            {
+                "target": "nsis",
+                "arch": ["x64"]
+            }
+        ],
+        "icon": "icons/rhelboat.ico",
+        "artifactName": "RHELboat-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+        "oneClick": false,
+        "perMachine": false,
+        "allowElevation": false,
+        "allowToChangeInstallationDirectory": true,
+        "runAfterFinish": false,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true,
+        "shortcutName": "RHELboat",
+        "deleteAppDataOnUninstall": false,
+        "installerIcon": "icons/rhelboat.ico",
+        "uninstallerIcon": "icons/rhelboat.ico",
+        "installerHeader": "icons/installer-header.bmp",
+        "installerSidebar": "icons/installer-sidebar.bmp",
+        "uninstallerSidebar": "icons/installer-sidebar.bmp",
+        "license": "LICENSE"
+    },
+    "afterPack": "scripts/verify-package.cjs"
 }

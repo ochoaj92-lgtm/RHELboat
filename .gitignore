@@ -7,7 +7,6 @@ build
 
 result
 
-package-lock.json
 # src/renderer/public/*
 
 # Custom

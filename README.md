@@ -27,7 +27,7 @@ Each step includes **Help with this step**: the relevant feature, why it is usef
 
 ## Run RHELboat
 
-Use **Linux** and **Node.js 24+**. Container exercises need **Podman or Docker**, available to your user; Docker must be running. The installation lab separately needs **QEMU**, `qemu-img`, and QEMU GTK display support. The first container start needs internet access to build the UBI 10 image; download the RHEL ISO yourself from Red Hat for the VM lab.
+The desktop app supports **Linux and Windows x64**. Windows installation and prerequisites are described in [the Windows guide](docs/WINDOWS.md). Development builds require **Node.js 24+**. Container exercises need **Podman or Docker**, available to your user; Docker must be running. On Linux, the managed installation VM separately needs **QEMU**, `qemu-img`, and QEMU GTK display support. On Windows, use an external RHEL VM and the same guided checkpoints; local ISO selection and SHA-256 verification remain available. The first container start needs internet access to build the UBI 10 image; download the RHEL ISO yourself from Red Hat for the VM lab.
 
 ```sh
 git clone https://github.com/ochoaj92-lgtm/RHELboat.git
@@ -48,10 +48,10 @@ makepkg -si
 
 This packages RHELboat against your system's Electron, installs desktop integration and icons, and enables launching with `rhelboat`.
 
-Bun 1.3+ can install the existing lockfile with `bun install --frozen-lockfile`; the app scripts use Node.js.
+Dependencies are locked with npm. Use `npm ci` for a reproducible development or CI install.
 
 1. Choose a training category and topic.
-2. For the installation lesson, use the VM panel to get an ISO, verify it, configure the VM, and start installation. Its QEMU console opens in a separate window beside the guide.
+2. For the installation lesson, download and verify an ISO. On Linux, use the managed QEMU panel. On Windows, attach the verified ISO in your external virtualization tool and follow the guide beside its guest console.
 3. For container exercises, select your runtime in **Lab setup**, or use **Start lab environment** beside the lesson. **Use in shell** inserts a command hint; press Enter to run it.
 4. Use **Check my work** to verify a container lab. Installation checkpoints and other VM or multiple-VM labs require saved step confirmations and use self-reported completion.
 
@@ -98,7 +98,7 @@ The VM's persistent disk is stored in `installation-vm/` inside Electron's appli
 
 **15 container labs** verify actual state. **25 VM or multiple-VM labs** list their prerequisites, require step confirmations, and record self-reported practice. The installation VM can be booted from other single-VM topics. Extra disks, snapshots, additional guests and product infrastructure must be prepared using your virtualization tools; the app does not provision or grade those environments.
 
-Use **Workbook references** to see the source title, release, section and PDF page range. **Open local PDF** opens a registered file from `training/` in the desktop PDF reader. In a packaged app, place personal copies in a `training/` folder beside the application resources (or inside the application directory for system Electron installs). Missing PDFs do not prevent the adapted lessons from working. The raw PDFs are kept local and excluded from Git and distributable packages.
+Use **Workbook references** to see the source title, release, section and PDF page range. On Windows, personal PDFs are read from `Documents\RHELboat\training`. **Open local PDF** opens a registered file from `training/` in the desktop PDF reader. In a packaged app, place personal copies in a `training/` folder beside the application resources (or inside the application directory for system Electron installs). Missing PDFs do not prevent the adapted lessons from working. The raw PDFs are kept local and excluded from Git and distributable packages.
 
 The sources cover both RHEL 9 and 10. Follow the source version shown beside a lesson, inspect your installed command’s documentation, and account for release differences. Legacy diagnostic notes supply investigation topics; their old commands and answer text are not treated as current procedures. See [the full topic-to-source map](docs/TRAINING.md).
 
@@ -123,9 +123,12 @@ npm run typecheck
 npm test
 npm run build
 npm run build:linux
+npm run build:win
 ```
 
 `build` writes the Electron main process and renderer to `build/`. `build:linux` packages AppImage, DEB, RPM, and tar archives into `dist/`, including the Containerfile for local lab creation. A generated unpacked build can be launched with `./dist/linux-unpacked/rhelboat`.
+
+`build:win` produces an assisted Windows x64 NSIS installer at `dist/RHELboat-Setup-<version>-x64.exe`. It installs the app and shortcuts; Docker Desktop/WSL and external RHEL virtualization remain separate prerequisites. The native Windows CI job installs, launches, and uninstalls the build. A Windows desktop and Docker Desktop lab check are still required before treating a release as validated.
 
 RPM packaging also requires your distribution's `rpmbuild` tool (`rpm` on Debian/Ubuntu, `rpm-build` on RHEL/Fedora). To build the other formats without it, run `npm run build` followed by `npx electron-builder --linux AppImage deb tar.bz2`.
 

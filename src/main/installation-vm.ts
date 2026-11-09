@@ -115,7 +115,7 @@ export class InstallationVM {
     }
 
     async capabilities(): Promise<VMCapabilities> {
-        if (process.platform !== "linux") return { available: false, kvm: false, message: "The installation VM currently requires a Linux host with QEMU." };
+        if (process.platform !== "linux") return { available: false, kvm: false, message: "Use an external RHEL virtual machine for this lesson. The managed QEMU launcher currently requires a Linux host." };
         const kvm = process.arch === "x64" && await access("/dev/kvm", constants.R_OK | constants.W_OK).then(() => true, () => false);
         try {
             await execute("qemu-img", ["--version"], { timeout: 5000 });
@@ -194,6 +194,7 @@ export class InstallationVM {
     }
 
     async status(): Promise<VMStatus> {
+        if (process.platform !== "linux") return { state: "stopped", diskExists: false, message: "Manage your RHEL VM in your virtualization tool. Guest steps are self-reported." };
         let manifest: Manifest | null = null;
         try {
             manifest = await this.disk();
@@ -225,6 +226,7 @@ export class InstallationVM {
 
     start(options: VMOptions): Promise<VMStatus> {
         return this.enqueue(async () => {
+            if (process.platform !== "linux") throw new Error("Use your external RHEL VM. The managed QEMU launcher requires Linux.");
             validate(options);
             const current = await this.status();
             if (current.state === "running") return current;

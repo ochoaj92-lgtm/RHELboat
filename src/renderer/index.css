@@ -2310,3 +2310,7 @@ h1 {
 .trainer-shell.dark-theme .progress-track {
     background: #334155;
 }
+
+.windows-setup .text-button {
+    margin: 14px 18px 0 0;
+}

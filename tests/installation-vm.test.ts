@@ -9,7 +9,14 @@ import test from "node:test";
 import { InstallationVM, buildQEMUArguments } from "../src/main/installation-vm.ts";
 import type { VMOptions } from "../src/shared/installation.js";
 
-const defaults: VMOptions = { memoryMiB: 4096, cpus: 2, diskGiB: 40, acceleration: "tcg", boot: "iso", expectedChecksum: "" };
+const defaults: VMOptions = {
+    memoryMiB: 4096,
+    cpus: 2,
+    diskGiB: 40,
+    acceleration: "tcg",
+    boot: "iso",
+    expectedChecksum: "",
+};
 
 async function createISO(directory: string): Promise<{ path: string; checksum: string }> {
     const bytes = Buffer.alloc(2 * 1024 * 1024);
@@ -30,22 +37,31 @@ async function waitStopped(vm: InstallationVM): Promise<void> {
     assert.fail("Temporary test VM did not stop.");
 }
 
-test("ISO verification, explicit VM resources, persistent disks and graceful lifecycle", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "rhelboat-vm-"));
-    const data = join(directory, "vm");
-    const calls = join(directory, "calls.jsonl");
-    const oldPath = process.env.PATH;
-    const vm = new InstallationVM(data);
-    try {
-        await writeFile(join(directory, "qemu-img"), `#!${process.execPath}
+test(
+    "ISO verification, explicit VM resources, persistent disks and graceful lifecycle",
+    { skip: process.platform !== "linux" },
+    async () => {
+        const directory = await mkdtemp(join(tmpdir(), "rhelboat-vm-"));
+        const data = join(directory, "vm");
+        const calls = join(directory, "calls.jsonl");
+        const oldPath = process.env.PATH;
+        const vm = new InstallationVM(data);
+        try {
+            await writeFile(
+                join(directory, "qemu-img"),
+                `#!${process.execPath}
 const fs=require('node:fs'); const args=process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(['image',...args])+'\\n');
 if(args[0]==='create')fs.writeFileSync(args[3],JSON.stringify({format:'qcow2','virtual-size':Number(args[4].slice(0,-1))*1024**3}));
 else if(args[0]==='info')process.stdout.write(fs.readFileSync(args[2]));
 else if(args[0]==='--version')process.stdout.write('QEMU fixture');
 else process.exit(2);
-`, { mode: 0o755 });
-        await writeFile(join(directory, "qemu-system-x86_64"), `#!${process.execPath}
+`,
+                { mode: 0o755 },
+            );
+            await writeFile(
+                join(directory, "qemu-system-x86_64"),
+                `#!${process.execPath}
 const fs=require('node:fs'); const net=require('node:net'); const args=process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(['qemu',...args])+'\\n');
 if(args[0]==='-display'){process.stdout.write('Available display backend types:\\nnone\\ngtk\\n');process.exit();}
@@ -67,102 +83,138 @@ const server=net.createServer(socket=>{
   }
  });
 });server.listen(socketPath);
-`, { mode: 0o755 });
-        process.env.PATH = `${directory}:${oldPath}`;
-        const iso = await createISO(directory);
-        await assert.rejects(vm.selectISO("/dev/sda"), /local .iso/);
-        await writeFile(join(directory, "partial.iso"), "partial");
-        await assert.rejects(vm.selectISO(join(directory, "partial.iso")), /complete RHEL/);
-        const invalid = Buffer.alloc(2 * 1024 * 1024);
-        await writeFile(join(directory, "invalid.iso"), invalid);
-        await assert.rejects(vm.selectISO(join(directory, "invalid.iso")), /ISO9660/);
-        const selected = await vm.selectISO(iso.path);
-        assert.equal(selected.sha256, iso.checksum);
-        assert.equal(selected.sizeBytes, 2 * 1024 * 1024);
-        const capabilities = await vm.capabilities();
-        assert.equal(capabilities.available, true, capabilities.message);
-        await assert.rejects(vm.start({ ...defaults, cpus: 1.5 }), /whole number/);
-        await assert.rejects(vm.start({ ...defaults, acceleration: "kvm; touch unsafe" as never }), /KVM or software/);
-        await assert.rejects(vm.start({ ...defaults, expectedChecksum: "00" }), /64-character/);
-        await assert.rejects(vm.start({ ...defaults, expectedChecksum: "0".repeat(64) }), /does not match/);
-        assert.equal((await vm.status()).diskExists, false);
+`,
+                { mode: 0o755 },
+            );
+            process.env.PATH = `${directory}:${oldPath}`;
+            const iso = await createISO(directory);
+            await assert.rejects(vm.selectISO("/dev/sda"), /local .iso/);
+            await writeFile(join(directory, "partial.iso"), "partial");
+            await assert.rejects(vm.selectISO(join(directory, "partial.iso")), /complete RHEL/);
+            const invalid = Buffer.alloc(2 * 1024 * 1024);
+            await writeFile(join(directory, "invalid.iso"), invalid);
+            await assert.rejects(vm.selectISO(join(directory, "invalid.iso")), /ISO9660/);
+            const selected = await vm.selectISO(iso.path);
+            assert.equal(selected.sha256, iso.checksum);
+            assert.equal(selected.sizeBytes, 2 * 1024 * 1024);
+            const capabilities = await vm.capabilities();
+            assert.equal(capabilities.available, true, capabilities.message);
+            await assert.rejects(vm.start({ ...defaults, cpus: 1.5 }), /whole number/);
+            await assert.rejects(
+                vm.start({ ...defaults, acceleration: "kvm; touch unsafe" as never }),
+                /KVM or software/,
+            );
+            await assert.rejects(vm.start({ ...defaults, expectedChecksum: "00" }), /64-character/);
+            await assert.rejects(vm.start({ ...defaults, expectedChecksum: "0".repeat(64) }), /does not match/);
+            assert.equal((await vm.status()).diskExists, false);
 
-        const options = { ...defaults, expectedChecksum: iso.checksum };
-        assert.equal((await vm.start(options)).state, "running");
-        assert.equal((await stat(data)).mode & 0o777, 0o700);
-        const diskBefore = await readFile(join(data, "disk.qcow2"), "utf8");
-        const reconnected = new InstallationVM(data);
-        assert.equal((await reconnected.status()).state, "running");
-        assert.match((await reconnected.shutdown()).message, /Shutdown requested/);
-        await waitStopped(vm);
-        assert.equal((await vm.status()).diskExists, true);
-        assert.equal(await readFile(join(data, "disk.qcow2"), "utf8"), diskBefore);
-        assert.equal((await reconnected.start({ ...defaults, boot: "disk" })).state, "running");
-        await reconnected.shutdown();
-        await waitStopped(vm);
+            const options = { ...defaults, expectedChecksum: iso.checksum };
+            assert.equal((await vm.start(options)).state, "running");
+            assert.equal((await stat(data)).mode & 0o777, 0o700);
+            const diskBefore = await readFile(join(data, "disk.qcow2"), "utf8");
+            const reconnected = new InstallationVM(data);
+            assert.equal((await reconnected.status()).state, "running");
+            assert.match((await reconnected.shutdown()).message, /Shutdown requested/);
+            await waitStopped(vm);
+            assert.equal((await vm.status()).diskExists, true);
+            assert.equal(await readFile(join(data, "disk.qcow2"), "utf8"), diskBefore);
+            assert.equal((await reconnected.start({ ...defaults, boot: "disk" })).state, "running");
+            await reconnected.shutdown();
+            await waitStopped(vm);
 
-        const history = (await readFile(calls, "utf8")).trim().split("\n").map(line => JSON.parse(line) as string[]);
-        const launches = history.filter(args => args[0] === "qemu" && args.includes("-name"));
-        assert.equal(launches.length, 2);
-        const first = launches[0];
-        assert.equal(first[first.indexOf("-accel") + 1], "tcg");
-        assert.equal(first[first.indexOf("-cpu") + 1], "max");
-        assert.equal(first.some(arg => /hostfwd|virtfs|9p|\/dev\//.test(arg)), false);
-        const blocks = first.flatMap((arg, index) => arg === "-blockdev" ? [JSON.parse(first[index + 1])] : []);
-        assert.ok(blocks.some(block => block.filename === iso.path && block["read-only"] === true));
-        assert.equal(launches[1].some(arg => arg.includes(iso.path)), false, "Booting the disk must detach installation media.");
-        assert.equal(history.filter(args => args[0] === "image" && args[1] === "create").length, 1);
+            const history = (await readFile(calls, "utf8"))
+                .trim()
+                .split("\n")
+                .map(line => JSON.parse(line) as string[]);
+            const launches = history.filter(args => args[0] === "qemu" && args.includes("-name"));
+            assert.equal(launches.length, 2);
+            const first = launches[0];
+            assert.equal(first[first.indexOf("-accel") + 1], "tcg");
+            assert.equal(first[first.indexOf("-cpu") + 1], "max");
+            assert.equal(
+                first.some(arg => /hostfwd|virtfs|9p|\/dev\//.test(arg)),
+                false,
+            );
+            const blocks = first.flatMap((arg, index) => (arg === "-blockdev" ? [JSON.parse(first[index + 1])] : []));
+            assert.ok(blocks.some(block => block.filename === iso.path && block["read-only"] === true));
+            assert.equal(
+                launches[1].some(arg => arg.includes(iso.path)),
+                false,
+                "Booting the disk must detach installation media.",
+            );
+            assert.equal(history.filter(args => args[0] === "image" && args[1] === "create").length, 1);
 
-        await rename(join(data, "disk.qcow2"), join(directory, "saved.qcow2"));
-        await symlink(join(directory, "saved.qcow2"), join(data, "disk.qcow2"));
-        assert.match((await vm.status()).message, /linked or non-regular/);
-        await assert.rejects(vm.start({ ...defaults, boot: "disk" }), /linked or non-regular/);
-        assert.equal(await readFile(join(directory, "saved.qcow2"), "utf8"), diskBefore);
-    } finally {
-        await vm.shutdown();
-        process.env.PATH = oldPath;
-        await rm(directory, { recursive: true, force: true });
-    }
-});
+            await rename(join(data, "disk.qcow2"), join(directory, "saved.qcow2"));
+            await symlink(join(directory, "saved.qcow2"), join(data, "disk.qcow2"));
+            assert.match((await vm.status()).message, /linked or non-regular/);
+            await assert.rejects(vm.start({ ...defaults, boot: "disk" }), /linked or non-regular/);
+            assert.equal(await readFile(join(directory, "saved.qcow2"), "utf8"), diskBefore);
+        } finally {
+            await vm.shutdown();
+            process.env.PATH = oldPath;
+            await rm(directory, { recursive: true, force: true });
+        }
+    },
+);
 
-test("VM control verifies both name and UUID before requesting shutdown", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "rhelboat-vm-owner-"));
-    const uuid = randomUUID();
-    await writeFile(join(directory, "disk.qcow2"), "owned test disk");
-    await writeFile(join(directory, "owner.json"), JSON.stringify({ owner: "RHELboat installation VM v1", uuid, diskGiB: 40 }));
-    const commands: string[] = [];
-    const server = createServer(socket => {
-        socket.write(JSON.stringify({ QMP: { version: {}, capabilities: [] } }) + "\r\n");
-        let buffer = "";
-        socket.on("data", chunk => {
-            buffer += chunk;
-            let boundary;
-            while ((boundary = buffer.indexOf("\n")) !== -1) {
-                const request = JSON.parse(buffer.slice(0, boundary));
-                buffer = buffer.slice(boundary + 1);
-                commands.push(request.execute);
-                const value = request.execute === "query-name" ? { name: "RHELboat-installation" } : request.execute === "query-uuid" ? { UUID: randomUUID() } : {};
-                socket.write(JSON.stringify({ return: value, id: request.id }) + "\r\n");
-            }
+test(
+    "VM control verifies both name and UUID before requesting shutdown",
+    { skip: process.platform !== "linux" },
+    async () => {
+        const directory = await mkdtemp(join(tmpdir(), "rhelboat-vm-owner-"));
+        const uuid = randomUUID();
+        await writeFile(join(directory, "disk.qcow2"), "owned test disk");
+        await writeFile(
+            join(directory, "owner.json"),
+            JSON.stringify({ owner: "RHELboat installation VM v1", uuid, diskGiB: 40 }),
+        );
+        const commands: string[] = [];
+        const server = createServer(socket => {
+            socket.write(JSON.stringify({ QMP: { version: {}, capabilities: [] } }) + "\r\n");
+            let buffer = "";
+            socket.on("data", chunk => {
+                buffer += chunk;
+                let boundary;
+                while ((boundary = buffer.indexOf("\n")) !== -1) {
+                    const request = JSON.parse(buffer.slice(0, boundary));
+                    buffer = buffer.slice(boundary + 1);
+                    commands.push(request.execute);
+                    const value =
+                        request.execute === "query-name"
+                            ? { name: "RHELboat-installation" }
+                            : request.execute === "query-uuid"
+                              ? { UUID: randomUUID() }
+                              : {};
+                    socket.write(JSON.stringify({ return: value, id: request.id }) + "\r\n");
+                }
+            });
         });
-    });
-    try {
-        await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(join(directory, "control.sock"), resolve); });
-        const vm = new InstallationVM(directory);
-        assert.match((await vm.status()).message, /not owned/);
-        assert.equal((await vm.shutdown()).state, "error");
-        assert.equal(commands.includes("query-uuid"), true);
-        assert.equal(commands.includes("system_powerdown"), false);
-    } finally {
-        await new Promise<void>(resolve => server.close(() => resolve()));
-        await rm(directory, { recursive: true, force: true });
-    }
-});
+        try {
+            await new Promise<void>((resolve, reject) => {
+                server.once("error", reject);
+                server.listen(join(directory, "control.sock"), resolve);
+            });
+            const vm = new InstallationVM(directory);
+            assert.match((await vm.status()).message, /not owned/);
+            assert.equal((await vm.shutdown()).state, "error");
+            assert.equal(commands.includes("query-uuid"), true);
+            assert.equal(commands.includes("system_powerdown"), false);
+        } finally {
+            await new Promise<void>(resolve => server.close(() => resolve()));
+            await rm(directory, { recursive: true, force: true });
+        }
+    },
+);
 
 test("argument construction keeps paths as JSON values and requires deliberate acceleration", () => {
     const manifest = { owner: "RHELboat installation VM v1", uuid: randomUUID(), diskGiB: 40 };
     const iso = '/tmp/disk,name with "quotes".iso';
-    const args = buildQEMUArguments("/tmp/rhelboat", manifest, { ...defaults, expectedChecksum: "a".repeat(64), acceleration: "kvm" }, iso);
+    const args = buildQEMUArguments(
+        "/tmp/rhelboat",
+        manifest,
+        { ...defaults, expectedChecksum: "a".repeat(64), acceleration: "kvm" },
+        iso,
+    );
     assert.equal(args[args.indexOf("-cpu") + 1], "host");
     assert.equal(args[args.indexOf("-display") + 1], "gtk");
     assert.ok(args.some(arg => arg.startsWith("{") && JSON.parse(arg).filename === iso));
@@ -170,38 +222,64 @@ test("argument construction keeps paths as JSON values and requires deliberate a
     assert.throws(() => buildQEMUArguments("/tmp/rhelboat", manifest, { ...defaults, memoryMiB: 1 }), /whole number/);
 });
 
-test("real headless QEMU starts a temporary disk and survives backend reconnection", { skip: process.env.RHELBOAT_QEMU_TEST !== "1", timeout: 30_000 }, async () => {
-    const directory = await mkdtemp(join(tmpdir(), "rhelboat-real-vm-"));
-    const vm = new InstallationVM(directory, "none");
+test(
+    "real headless QEMU starts a temporary disk and survives backend reconnection",
+    { skip: process.platform !== "linux" || process.env.RHELBOAT_QEMU_TEST !== "1", timeout: 30_000 },
+    async () => {
+        const directory = await mkdtemp(join(tmpdir(), "rhelboat-real-vm-"));
+        const vm = new InstallationVM(directory, "none");
+        try {
+            const iso = await createISO(directory);
+            await vm.selectISO(iso.path);
+            assert.equal(
+                (await vm.start({ ...defaults, memoryMiB: 2048, cpus: 1, expectedChecksum: iso.checksum })).state,
+                "running",
+            );
+            assert.equal((await new InstallationVM(directory, "none").status()).state, "running");
+            assert.match((await vm.shutdown()).message, /Shutdown requested/);
+        } finally {
+            // This firmware-only smoke test has no guest OS to handle ACPI, so terminate only its private monitor.
+            await new Promise<void>((resolve, reject) => {
+                const socket = createConnection(join(directory, "control.sock"));
+                let ready = false;
+                let buffer = "";
+                socket.on("error", error => {
+                    const code = (error as NodeJS.ErrnoException).code;
+                    if (code === "ENOENT" || (ready && (code === "ECONNRESET" || code === "EPIPE"))) resolve();
+                    else reject(error);
+                });
+                socket.on("close", () => resolve());
+                socket.on("data", chunk => {
+                    buffer += chunk;
+                    let boundary;
+                    while ((boundary = buffer.indexOf("\n")) !== -1) {
+                        const reply = JSON.parse(buffer.slice(0, boundary));
+                        buffer = buffer.slice(boundary + 1);
+                        if (reply.QMP) socket.write('{"execute":"qmp_capabilities","id":"cap"}\n');
+                        else if (reply.id === "cap" && !ready) {
+                            ready = true;
+                            socket.write('{"execute":"quit"}\n');
+                        }
+                    }
+                });
+            });
+            await rm(directory, { recursive: true, force: true });
+        }
+    },
+);
+
+test("local ISO hashing works independently of the managed Linux VM", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "rhelboat iso hash "));
     try {
         const iso = await createISO(directory);
-        await vm.selectISO(iso.path);
-        assert.equal((await vm.start({ ...defaults, memoryMiB: 2048, cpus: 1, expectedChecksum: iso.checksum })).state, "running");
-        assert.equal((await new InstallationVM(directory, "none").status()).state, "running");
-        assert.match((await vm.shutdown()).message, /Shutdown requested/);
+        const vm = new InstallationVM(directory);
+        assert.equal((await vm.selectISO(iso.path)).sha256, iso.checksum);
+        if (process.platform !== "linux") {
+            assert.equal((await vm.capabilities()).available, false);
+            assert.equal((await vm.status()).diskExists, false);
+            await assert.rejects(vm.start(defaults), /external RHEL VM/);
+        }
     } finally {
-        // This firmware-only smoke test has no guest OS to handle ACPI, so terminate only its private monitor.
-        await new Promise<void>((resolve, reject) => {
-            const socket = createConnection(join(directory, "control.sock"));
-            let ready = false;
-            let buffer = "";
-            socket.on("error", error => {
-                const code = (error as NodeJS.ErrnoException).code;
-                if (code === "ENOENT" || (ready && (code === "ECONNRESET" || code === "EPIPE"))) resolve();
-                else reject(error);
-            });
-            socket.on("close", () => resolve());
-            socket.on("data", chunk => {
-                buffer += chunk;
-                let boundary;
-                while ((boundary = buffer.indexOf("\n")) !== -1) {
-                    const reply = JSON.parse(buffer.slice(0, boundary));
-                    buffer = buffer.slice(boundary + 1);
-                    if (reply.QMP) socket.write('{"execute":"qmp_capabilities","id":"cap"}\n');
-                    else if (reply.id === "cap" && !ready) { ready = true; socket.write('{"execute":"quit"}\n'); }
-                }
-            });
-        });
         await rm(directory, { recursive: true, force: true });
     }
 });

@@ -1,28 +1,27 @@
 name: Build RHELboat
 on:
     push:
-        branches: [main]
+        branches: [main, RHELBoat-v1, windows-installer]
         tags: ["v*"]
+    pull_request:
     workflow_dispatch:
 permissions:
     contents: read
 jobs:
-    build:
+    linux:
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v6
             - uses: actions/setup-node@v6
               with:
                   node-version: 24
-            - uses: oven-sh/setup-bun@v2
+                  cache: npm
             - name: Install Linux packaging tools
-              run: sudo apt-get update && sudo apt-get install -y rpm
-            - name: Install dependencies
-              run: bun ci
-            - name: Typecheck and test
-              run: bun run typecheck && bun run test
+              run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
+            - run: npm ci
+            - run: npm run typecheck && npm test
             - name: Package Linux trainer
-              run: bun run build:linux
+              run: npm run build:linux
               env:
                   ELECTRON_BUILDER_COMPRESSION_LEVEL: 5
             - uses: actions/upload-artifact@v7
@@ -32,4 +31,44 @@ jobs:
                       dist/*.AppImage
                       dist/*.deb
                       dist/*.rpm
+                      dist/*.pacman
                       dist/*.tar.bz2
+    windows:
+        runs-on: windows-2022
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
+            - run: npm run typecheck
+            - run: npm test
+            - name: Build Windows installer
+              run: npm run build:win
+              env:
+                  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+            - name: Install, launch and uninstall
+              shell: pwsh
+              run: |
+                  $installer = Get-ChildItem dist/RHELboat-Setup-*-x64.exe | Select-Object -First 1
+                  $installDir = Join-Path $env:RUNNER_TEMP 'RHELboat Installer Test'
+                  $installed = Start-Process -FilePath $installer.FullName -ArgumentList "/S /currentuser /D=$installDir" -Wait -PassThru
+                  if ($installed.ExitCode -ne 0) { throw "Installer failed: $($installed.ExitCode)" }
+                  try {
+                      node scripts/windows-smoke.mjs "$installDir/RHELboat.exe"
+                      if ($LASTEXITCODE -ne 0) { throw 'Installed application smoke test failed' }
+                  } finally {
+                      $uninstaller = Join-Path $installDir 'Uninstall RHELboat.exe'
+                      if (Test-Path $uninstaller) {
+                          $removed = Start-Process -FilePath $uninstaller -ArgumentList "/S _?=$installDir" -Wait -PassThru
+                          if ($removed.ExitCode -ne 0) { throw "Uninstaller failed: $($removed.ExitCode)" }
+                      }
+                  }
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: rhelboat-windows-x64
+                  if-no-files-found: error
+                  path: |
+                      dist/RHELboat-Setup-*-x64.exe
+                      dist/RHELboat-Setup-*-x64.exe.blockmap

@@ -40,6 +40,11 @@ const checks: Record<string, string> = {
 
 export const supportedCheckIds = Object.keys(checks);
 
+export function runtimeExecutable(runtime: Runtime, platform: string = process.platform): string {
+    requireRuntime(runtime);
+    return platform === "win32" ? `${runtime}.exe` : runtime;
+}
+
 function requireRuntime(runtime: unknown): asserts runtime is Runtime {
     if (runtime !== "podman" && runtime !== "docker") throw new Error("Choose Podman or Docker.");
 }
@@ -74,13 +79,29 @@ export class ContainerLab {
     }
 
     private async run(runtime: Runtime, args: string[], timeout = 30_000): Promise<string> {
-        const pending = execute(runtime, args, { timeout, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" });
+        const pending = execute(runtimeExecutable(runtime), args, {
+            timeout,
+            maxBuffer: 2 * 1024 * 1024,
+            encoding: "utf8",
+            windowsHide: true,
+        });
         if (args[0] === "build") this.activeBuild = pending.child;
         try {
             return (await pending).stdout;
         } finally {
             if (this.activeBuild === pending.child) this.activeBuild = null;
         }
+    }
+
+    private async checkRuntime(runtime: Runtime): Promise<void> {
+        if (runtime === "docker") {
+            const os = await this.run(runtime, ["info", "--format", "{{.OSType}}"], 15_000);
+            if (os.trim().toLowerCase() !== "linux") {
+                throw new Error(
+                    "Choose the Linux containers engine in Docker Desktop, then start the lab again. RHELboat cannot run its UBI lab as a Windows container.",
+                );
+            }
+        } else await this.run(runtime, ["info"], 15_000);
     }
 
     private async inspect(runtime: Runtime): Promise<{ running: boolean } | null> {
@@ -100,7 +121,7 @@ export class ContainerLab {
         requireRuntime(runtime);
         if (this.current.state === "starting") return { ...this.current };
         try {
-            await this.run(runtime, ["info"], 15_000);
+            await this.checkRuntime(runtime);
             const container = await this.inspect(runtime);
             if (runtime === this.runtime && this.shell && container?.running) return { ...this.current };
             return {
@@ -139,7 +160,7 @@ export class ContainerLab {
         };
         this.emitOutput(`${this.current.message}\n`);
         try {
-            await this.run(runtime, ["info"], 15_000);
+            await this.checkRuntime(runtime);
             this.assertStartActive(generation);
             const container = await this.inspect(runtime);
             this.assertStartActive(generation);
@@ -206,7 +227,7 @@ export class ContainerLab {
 
     private attachShell(): void {
         const child = spawn(
-            this.runtime,
+            runtimeExecutable(this.runtime),
             [
                 "exec",
                 "--interactive",
@@ -225,7 +246,7 @@ export class ContainerLab {
                 "/bin/bash --noprofile --norc",
                 "/dev/null",
             ],
-            { stdio: ["pipe", "pipe", "pipe"] },
+            { stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
         );
         this.shell = child;
         child.stdout.on("data", chunk => this.emitOutput(chunk.toString().slice(-32_000)));

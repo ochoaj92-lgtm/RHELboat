@@ -8,6 +8,7 @@ import { workbookPath } from "./workbooks.js";
 import type { VMOptions } from "../shared/installation.js";
 
 app.setName("RHELboat");
+if (process.platform === "win32") app.setAppUserModelId("app.rhelboat.trainer");
 if (process.platform === "linux") app.setDesktopName("rhelboat.desktop");
 let mainWindow: BrowserWindow | null = null;
 let lab: ContainerLab;
@@ -83,9 +84,12 @@ if (!app.requestSingleInstanceLock()) {
         const installation = new InstallationVM(join(app.getPath("userData"), "installation-vm"));
         const handlers = {
             "trainer:open-workbook": async (id: unknown) => {
-                const directory = existsSync(join(process.resourcesPath, "training"))
-                    ? join(process.resourcesPath, "training")
-                    : join(appDir, "training");
+                const directory =
+                    process.platform === "win32"
+                        ? join(app.getPath("documents"), "RHELboat", "training")
+                        : existsSync(join(process.resourcesPath, "training"))
+                          ? join(process.resourcesPath, "training")
+                          : join(appDir, "training");
                 const error = await shell.openPath(await workbookPath(directory, id));
                 if (error) throw new Error(error);
             },
@@ -113,11 +117,16 @@ if (!app.requestSingleInstanceLock()) {
                 const parsed = new URL(url);
                 if (
                     parsed.protocol !== "https:" ||
-                    !["www.redhat.com", "access.redhat.com", "docs.redhat.com", "developers.redhat.com"].includes(
-                        parsed.hostname,
-                    )
+                    ![
+                        "www.redhat.com",
+                        "access.redhat.com",
+                        "docs.redhat.com",
+                        "developers.redhat.com",
+                        "docs.docker.com",
+                        "learn.microsoft.com",
+                    ].includes(parsed.hostname)
                 ) {
-                    throw new Error("Only official Red Hat sources may be opened");
+                    throw new Error("Only approved training and setup documentation may be opened");
                 }
                 return shell.openExternal(parsed.href);
             },

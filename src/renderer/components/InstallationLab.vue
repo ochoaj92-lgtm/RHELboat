@@ -7,6 +7,7 @@ withDefaults(defineProps<{ installing?: boolean }>(), { installing: true });
 defineEmits<{ (event: "open-installation"): void }>();
 
 const api = window.trainer;
+const isWindows = api?.platform === "win32";
 const vm = api?.installation;
 const capabilities = ref<VMCapabilities>({ available: false, kvm: false, message: "Checking QEMU…" });
 const status = ref<VMStatus>({ state: "stopped", diskExists: false, message: "Prepare your first installation." });
@@ -132,12 +133,14 @@ async function shutdown() {
     <section class="terminal-pane installation-pane" aria-label="RHEL practice virtual machine">
         <div class="terminal-header">
             <div>
-                <TrainerIcon name="package" /><strong>{{ installing ? "Installation VM" : "Practice VM" }}</strong
-                ><span>QEMU</span>
+                <TrainerIcon name="package" /><strong>{{
+                    isWindows ? "External RHEL VM" : installing ? "Installation VM" : "Practice VM"
+                }}</strong
+                ><span>{{ isWindows ? "Windows" : "QEMU" }}</span>
             </div>
             <span class="terminal-state"
                 ><span class="status-dot" :class="{ online: running }"></span
-                >{{ running ? "Running" : "Stopped" }}</span
+                >{{ isWindows ? "External console" : running ? "Running" : "Stopped" }}</span
             >
         </div>
         <div class="installation-scroll">
@@ -145,14 +148,33 @@ async function shutdown() {
                 <span class="terminal-eyebrow">{{
                     installing ? "INSTALL THE REAL OPERATING SYSTEM" : "WORK IN YOUR RHEL GUEST"
                 }}</span>
-                <h3>{{ installing ? "Your first RHEL machine." : "Boot your practice system." }}</h3>
-                <p>Follow the lesson here and work in the real QEMU console window beside RHELboat.</p>
+                <h3>
+                    {{
+                        isWindows
+                            ? "Use your RHEL VM console."
+                            : installing
+                              ? "Your first RHEL machine."
+                              : "Boot your practice system."
+                    }}
+                </h3>
+                <p>
+                    {{
+                        isWindows
+                            ? "Follow the lesson beside a disposable RHEL VM in your Windows virtualization tool. The built-in QEMU launcher is available on Linux hosts."
+                            : "Follow the lesson here and work in the real QEMU console window beside RHELboat."
+                    }}
+                </p>
             </div>
             <div v-if="!vm" class="installation-notice">
                 This is the lesson preview. Open the desktop app to select an ISO and launch the VM.
             </div>
-            <div v-else-if="!capabilities.available" class="installation-notice">
+            <div v-else-if="!capabilities.available && !isWindows" class="installation-notice">
                 {{ capabilities.message }} Install QEMU with its GTK display module on your Linux host.
+            </div>
+            <div v-if="isWindows" class="installation-notice">
+                Prepare a disposable x86_64 RHEL VM with a dedicated virtual disk. Suggested sizing: 2 vCPUs, 4 GiB RAM
+                and 40 GiB disk. Attach the verified DVD ISO in your virtualization tool, then follow the installer
+                steps. Detach the ISO before booting the installed disk. VM power and disk operations stay in that tool.
             </div>
             <section v-if="installing" class="installation-card">
                 <h4><span>01</span> Get your installation media</h4>
@@ -187,18 +209,20 @@ async function shutdown() {
                         role="status"
                         ><TrainerIcon :name="checksumMatches ? 'check' : 'info'" />{{
                             checksumMatches
-                                ? "Checksum matches — ready to boot"
+                                ? isWindows
+                                    ? "Checksum matches — ready to attach to your VM"
+                                    : "Checksum matches — ready to boot"
                                 : "Checksum does not match yet. Check the release and image."
                         }}</span
                     >
                 </div>
             </section>
-            <div v-if="!installing && !status.diskExists" class="installation-notice">
+            <div v-if="!installing && !status.diskExists && !isWindows" class="installation-notice">
                 Install a RHEL guest first, or use your own disposable VM. Extra disks and other machines must be
                 prepared with your virtualization tools.
                 <button class="button secondary" @click="$emit('open-installation')">Open installation practice</button>
             </div>
-            <section class="installation-card">
+            <section v-if="!isWindows" class="installation-card">
                 <h4><span>02</span> Configure your training VM</h4>
                 <fieldset :disabled="busy || running">
                     <div class="vm-resources">
@@ -233,7 +257,7 @@ async function shutdown() {
                     Networking uses QEMU’s user-mode NAT; no host folders, raw disks, or forwarded ports are attached.
                 </p>
             </section>
-            <section class="installation-card">
+            <section v-if="!isWindows" class="installation-card">
                 <h4>
                     <span>03</span> {{ installing ? "Practice in the installer" : "Continue in the guest console" }}
                 </h4>
@@ -276,7 +300,12 @@ async function shutdown() {
             </div>
         </div>
         <footer class="terminal-footer">
-            <span><TrainerIcon name="shield" />Dedicated virtual disk · installer choices stay yours</span
+            <span
+                ><TrainerIcon name="shield" />{{
+                    isWindows
+                        ? "Use a disposable guest and a dedicated virtual disk"
+                        : "Dedicated virtual disk · installer choices stay yours"
+                }}</span
             ><span>Guest steps are self-reported</span>
         </footer>
     </section>

@@ -49,7 +49,7 @@ export const lessons: Lesson[] = [
         objective:
             "Download and verify a RHEL ISO, install it on the app's dedicated virtual disk, and verify your configuration after reboot.",
         explanation:
-            "A Linux distribution combines a kernel, system tools and packaged applications. Build a disposable RHEL system before practicing services, disks and networking. The workbooks use RHEL 9 and the study guide uses RHEL 10; follow the installer for the release you downloaded. These checkpoints record your own actions in the real guest console.",
+            "A Linux distribution combines a kernel, system tools and packaged applications. Build a disposable RHEL system before practicing services, disks and networking. The workbooks use RHEL 9 and the study guide uses RHEL 10; follow the installer for the release you downloaded. Use the managed QEMU console on Linux or an external RHEL VM on Windows. These checkpoints record your own actions in the guest console.",
         environment: "vm",
         steps: [
             {
@@ -76,9 +76,9 @@ export const lessons: Lesson[] = [
                 id: "configure-vm",
                 title: "Allocate your practice machine",
                 instruction:
-                    "Use the VM panel to configure a dedicated machine. Start with 2 virtual CPUs, 4096 MiB RAM and a 40 GiB virtual disk; these are training suggestions, not Red Hat's minimum requirements. Install the host's QEMU system emulator, qemu-img and GTK display support first. RHEL 10 x86_64 requires x86-64-v3 CPU features. Compatible KVM hardware is preferred; software emulation is much slower. The app uses only its own virtual disk and does not attach host disks or shared folders.",
+                    "On Linux, configure the dedicated machine in the managed VM panel after installing QEMU, qemu-img and GTK display support. On Windows, create a disposable RHEL guest in your external virtualization tool. Start with 2 vCPUs, 4096 MiB RAM and a 40 GiB dedicated virtual disk; these are training suggestions, not Red Hat's minimum requirements. RHEL 10 x86_64 needs x86-64-v3 CPU features. Verify the selected virtual disk and keep host disks and shared folders outside this exercise.",
                 help: {
-                    feature: "QEMU virtual hardware",
+                    feature: "Virtual hardware",
                     why: "A dedicated virtual disk lets you practice installation without selecting a host disk.",
                 },
             },
@@ -86,7 +86,7 @@ export const lessons: Lesson[] = [
                 id: "boot-install-media",
                 title: "Boot the installer",
                 instruction:
-                    "Start the VM from the verified ISO. Arrange the QEMU console beside this guide. Choose Test this media & install Red Hat Enterprise Linux from the guest boot menu, and let its media check finish. All installer actions happen in that VM console; the container shell is not the installation target.",
+                    "Start the VM from the verified ISO. On Linux use the managed VM panel; on Windows attach the ISO in your external virtualization tool. Arrange the guest console beside this guide. Choose Test this media & install Red Hat Enterprise Linux from the guest boot menu, and let its media check finish. All installer actions happen in that VM console; the container shell is not the installation target.",
                 help: {
                     feature: "Anaconda media check",
                     why: "Checking the media catches a damaged image before it writes an installation.",
@@ -126,7 +126,7 @@ export const lessons: Lesson[] = [
                 id: "network-time",
                 title: "Configure hostname, network and time",
                 instruction:
-                    "In Network & Host Name, enable the VM's virtual network interface and inspect its assigned address. Set a training hostname such as rhel-lab.example.test and apply it. Use the VM's user-mode network for this exercise; avoid changing host networking. In Time & Date, choose your region and inspect time synchronization. Write down the hostname, interface and timezone to verify after installation.",
+                    "In Network & Host Name, enable the VM's virtual network interface and inspect its assigned address. Set a training hostname such as rhel-lab.example.test and apply it. Use private or NAT guest networking for this exercise; avoid changing host networking. In Time & Date, choose your region and inspect time synchronization. Write down the hostname, interface and timezone to verify after installation.",
                 help: {
                     feature: "NetworkManager and time settings",
                     why: "Persistent networking, hostname and accurate time are prerequisites for later administration labs.",
@@ -146,7 +146,7 @@ export const lessons: Lesson[] = [
                 id: "review-install",
                 title: "Review and perform the installation",
                 instruction:
-                    "Return to Installation Summary and resolve incomplete items. Check destination, storage changes, source, software, hostname, time and account settings against your plan. Begin installation only after confirming that the destination is the app's virtual disk. Let package installation complete without stopping the VM. Registration can be performed separately using your own eligible account and entitlement; RHELboat does not accept terms or register the guest for you.",
+                    "Return to Installation Summary and resolve incomplete items. Check destination, storage changes, source, software, hostname, time and account settings against your plan. Begin installation only after confirming that the destination is the dedicated training virtual disk. Let package installation complete without stopping the VM. Registration can be performed separately using your own eligible account and entitlement; RHELboat does not accept terms or register the guest for you.",
                 help: {
                     feature: "Installation summary",
                     why: "Reviewing the plan before writing the disk prevents avoidable configuration mistakes.",
@@ -156,7 +156,7 @@ export const lessons: Lesson[] = [
                 id: "boot-installed-system",
                 title: "Start from the installed disk",
                 instruction:
-                    "After installation finishes, stop the guest before booting its disk without the ISO. In the QEMU console use Ctrl+Alt+F1, then press and release Ctrl+B followed by 2 to reach the installer shell; run poweroff. Wait for the panel to show Stopped, then choose Boot installed disk. Confirm that the installed system reaches its login prompt. If your release provides a different console layout, use its installer documentation to locate the shell.",
+                    "After installation finishes, stop the guest before booting its disk without the ISO. On Windows, detach the ISO and start the installed disk using your virtualization tool. On Linux, use this managed VM procedure: In the QEMU console use Ctrl+Alt+F1, then press and release Ctrl+B followed by 2 to reach the installer shell; run poweroff. Wait for the panel to show Stopped, then choose Boot installed disk. Confirm that the installed system reaches its login prompt. If your release provides a different console layout, use its installer documentation to locate the shell.",
                 help: {
                     feature: "Installer console and poweroff",
                     why: "Stop the guest before starting the disk without the ISO so the installer does not boot again.",
@@ -203,7 +203,7 @@ export const lessons: Lesson[] = [
         ],
         requirements: [
             "Download a RHEL DVD ISO and its SHA-256 from Red Hat.",
-            "QEMU with GTK support; a separate guest console opens beside the lesson.",
+            "Linux: QEMU with GTK support. Windows: an external virtualization tool and a disposable RHEL guest.",
         ],
     },
     {

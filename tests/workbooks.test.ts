@@ -15,8 +15,11 @@ test("workbook requests only resolve registered local regular files", async () =
         const expected = join(directory, workbooks.system1.filename);
         await writeFile(expected, "%PDF-1.4 fixture");
         assert.equal(await workbookPath(directory, "system1"), expected);
-        await symlink(expected, join(directory, workbooks.diagnostics.filename));
-        await assert.rejects(workbookPath(directory, "diagnostics"), /local copy/);
+        // Windows symlink creation requires elevation or Developer Mode; Linux CI covers this rejection.
+        if (process.platform !== "win32") {
+            await symlink(expected, join(directory, workbooks.diagnostics.filename));
+            await assert.rejects(workbookPath(directory, "diagnostics"), /local copy/);
+        }
     } finally {
         await rm(directory, { recursive: true, force: true });
     }

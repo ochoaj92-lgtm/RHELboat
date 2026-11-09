@@ -10,6 +10,7 @@ import { normalizeProgress } from "../data/progress";
 import type { LabStatus, Runtime, CheckResult } from "../../shared/trainer.js";
 
 const api = window.trainer;
+const isWindows = api?.platform === "win32";
 const section = ref("learn");
 const isDark = ref(false);
 const search = ref("");
@@ -20,10 +21,10 @@ const hintVisible = ref(false);
 const overviewVisible = ref(false);
 const completed = ref<string[]>([]);
 const installationCheckpoints = ref<string[]>([]);
-const runtime = ref<Runtime>("podman");
+const runtime = ref<Runtime>(isWindows ? "docker" : "podman");
 const status = ref<LabStatus>({
     state: "stopped",
-    runtime: "podman",
+    runtime: runtime.value,
     message: "Ready when you are. Start a lab to open your Linux shell.",
 });
 const busy = ref(false);
@@ -1031,8 +1032,35 @@ function resetAllProgress() {
                 <div class="eyebrow">A WORKSPACE YOU CAN EXPERIMENT IN</div>
                 <h1>Your Linux lab.</h1>
                 <p>
-                    A disposable UBI 10 container for foundational practice. Podman is recommended; Docker also works.
+                    A disposable UBI 10 container for foundational practice.
+                    {{
+                        isWindows
+                            ? "On Windows, use Docker Desktop with its Linux containers engine, or a running Podman machine."
+                            : "Podman is recommended; Docker also works."
+                    }}
                 </p>
+                <article v-if="isWindows" class="setup-card windows-setup">
+                    <div>
+                        <h2>Prepare Windows for Linux labs</h2>
+                        <p>
+                            Install and start Docker Desktop with its WSL 2 backend and Linux containers engine. Check
+                            that docker info works in PowerShell, then reopen RHELboat. The installer does not install
+                            or configure Docker or WSL.
+                        </p>
+                        <button
+                            class="text-button"
+                            @click="openSource('https://docs.docker.com/desktop/setup/install/windows-install/')"
+                        >
+                            Docker Desktop setup <TrainerIcon name="external" />
+                        </button>
+                        <button
+                            class="text-button"
+                            @click="openSource('https://learn.microsoft.com/en-us/windows/wsl/install')"
+                        >
+                            WSL setup <TrainerIcon name="external" />
+                        </button>
+                    </div>
+                </article>
                 <article class="setup-card">
                     <TrainerIcon name="terminal" />
                     <div>
