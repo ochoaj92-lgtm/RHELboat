@@ -47,7 +47,7 @@ export const lessons: Lesson[] = [
         topic: "Installation and initial configuration",
         duration: 90,
         objective:
-            "Download and verify a RHEL ISO, install it on the app's dedicated virtual disk, and verify your configuration after reboot.",
+            "Download and verify a RHEL ISO, install it on a dedicated training virtual disk, and verify your configuration after reboot.",
         explanation:
             "A Linux distribution combines a kernel, system tools and packaged applications. Build a disposable RHEL system before practicing services, disks and networking. The workbooks use RHEL 9 and the study guide uses RHEL 10; follow the installer for the release you downloaded. Use the managed QEMU console on Linux or an external RHEL VM on Windows. These checkpoints record your own actions in the guest console.",
         environment: "vm",
@@ -178,7 +178,7 @@ export const lessons: Lesson[] = [
                 id: "prove-persistence",
                 title: "Reboot and prove persistence",
                 instruction:
-                    "Reboot the guest normally, log in again and repeat the checks for hostname, storage mounts, networking and administrative access. Record any mismatch and correct it in the VM. Mark the checkpoints you actually performed and review the guide only after the installed system works again. To stop later, shut down from the guest or request a graceful shutdown from the VM panel and wait for it to stop; do not force-close QEMU during disk writes.",
+                    "Reboot the guest normally, log in again and repeat the checks for hostname, storage mounts, networking and administrative access. Record any mismatch and correct it in the VM. Mark the checkpoints you actually performed and review the guide only after the installed system works again. To stop later, shut down from the guest or use the power controls in your virtualization tool; the managed Linux VM panel can request a graceful shutdown. Wait for the guest to stop and do not force-close its console during disk writes.",
                 command: "sudo systemctl reboot",
                 help: {
                     feature: "Reboot validation",

@@ -65,7 +65,7 @@ The browser preview shows the curriculum. Container execution, ISO selection and
 
 ## Install RHEL hands-on
 
-The Getting started lesson, **Install RHEL from the official ISO**, follows the real installation workflow with saved checkpoints:
+The Getting started lesson, **Install RHEL from the official ISO**, follows the real installation workflow with saved checkpoints. The managed-VM steps below apply on Linux; Windows follows the guest workflow in an external VM as described in [the Windows guide](docs/WINDOWS.md):
 
 1. Open [Red Hat's download page](https://developers.redhat.com/products/rhel/download), sign in yourself, and choose the release and architecture for your preparation. The current VM launcher uses x86_64. Prefer the DVD ISO for a self-contained installation; Boot ISO needs an additional source.
 2. Select the downloaded ISO in the app, paste the matching 64-character SHA-256 value from Red Hat, and verify it. No release checksum or expiring download URL is hardcoded. A match confirms the selected bytes against the value you supplied; you must obtain that value from the official source.

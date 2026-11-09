@@ -643,10 +643,15 @@ function resetAllProgress() {
                             </div>
                             <div v-if="isInstallation" class="vm-notice">
                                 <TrainerIcon name="info" />
-                                <p>
+                                <p v-if="!isWindows">
                                     Use the installation VM controls beside this lesson. The real installer opens in a
                                     separate QEMU window. Complete each checkpoint before continuing; guest
                                     configuration is self-reported.
+                                </p>
+                                <p v-else>
+                                    Verify the ISO beside this lesson, then attach it to your external RHEL VM on
+                                    Windows. Work in that guest console and confirm each checkpoint as you complete it.
+                                    Guest configuration is self-reported.
                                 </p>
                             </div>
                             <div v-else-if="lesson.environment !== 'container'" class="vm-notice">
