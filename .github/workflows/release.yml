@@ -9,6 +9,7 @@ permissions:
     contents: read
 jobs:
     linux:
+        if: github.event_name != 'workflow_dispatch'
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v6
@@ -66,9 +67,42 @@ jobs:
                       }
                   }
             - uses: actions/upload-artifact@v7
+              id: installer
               with:
                   name: rhelboat-windows-x64
                   if-no-files-found: error
                   path: |
                       dist/RHELboat-Setup-*-x64.exe
                       dist/RHELboat-Setup-*-x64.exe.blockmap
+            - name: Show installer download and build instructions
+              shell: pwsh
+              env:
+                  INSTALLER_URL: ${{ steps.installer.outputs.artifact-url }}
+              run: |
+                  $summary = @'
+                  ## Windows x64 installer
+
+                  [Download the installer ZIP]({0}) · [Open the builder]({1}/{2}/actions/workflows/release.yml?query=branch%3Awindows-installer) · [Full build instructions]({1}/{2}/blob/{3}/docs/WINDOWS.md#build-with-github-actions)
+
+                  Extract the ZIP and run `RHELboat-Setup-<version>-x64.exe`. This build is unsigned.
+
+                  Typechecking, portable tests, installation into a path with spaces, app launch and uninstallation passed. Docker Desktop labs and external RHEL VM exercises still need Windows desktop testing.
+
+                  ### Build again on GitHub
+
+                  Open the builder, select **Run workflow**, choose the **windows-installer** branch, then select **Run workflow**. Manual runs on this branch build Windows only. GitHub requires repository write access to start a build and a signed-in account to download artifacts.
+
+                  ### Build locally on Windows
+
+                  With Node.js 24+ and npm, check out the `windows-installer` branch and run:
+
+                  ```powershell
+                  npm ci
+                  npm run typecheck
+                  npm test
+                  npm run build:win
+                  ```
+
+                  The installer is written to `dist/RHELboat-Setup-<version>-x64.exe`.
+                  '@
+                  $summary -f $env:INSTALLER_URL, $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_SHA | Add-Content -Path $env:GITHUB_STEP_SUMMARY

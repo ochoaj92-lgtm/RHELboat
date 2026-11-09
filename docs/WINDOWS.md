@@ -4,7 +4,7 @@ The Windows x64 build includes the training categories, lessons, quizzes, saved 
 
 ## Install and start
 
-1. On a supported Windows x64 desktop, run `RHELboat-Setup-<version>-x64.exe` from the build artifacts. Windows 11 x64 is the initial target. ARM64 is not a native build target yet.
+1. Download **rhelboat-windows-x64** from a successful run of the [Windows installer builder](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml?query=branch%3Awindows-installer), extract the ZIP, and run `RHELboat-Setup-<version>-x64.exe` on a supported Windows x64 desktop. Windows 11 x64 is the initial target. ARM64 is not a native build target yet.
 2. Follow the assisted installer. It defaults to a per-user installation and offers an installation-directory choice. Start-menu and desktop shortcuts are created. The app includes its own runtime; learners do not need Node.js.
 3. Open RHELboat. Lessons and quizzes work without a container runtime. Container labs require the separate setup below.
 
@@ -43,11 +43,25 @@ Put personal copies of the registered PDFs in `Documents\RHELboat\training`. Req
 
 Progress and application settings are stored in Electron's user-data directory, normally `%APPDATA%\RHELboat`. Export progress from My progress to transfer it to another computer. Uninstalling the application preserves this data, your personal PDFs, container data and external VMs.
 
+## Build with GitHub Actions
+
+**[Open the Windows installer builder](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml?query=branch%3Awindows-installer)**
+
+1. Sign in with repository write access. If you do not have it, download an existing successful build or fork the repository with all branches, enable Actions in the fork, and use **Actions → Build RHELboat**.
+2. Select **Run workflow**, choose **windows-installer** in the **Branch** dropdown, then select **Run workflow**. Select this branch explicitly: the repository's default branch still contains the older Linux-only workflow.
+3. Open the new run and wait for the **windows** job to succeed. Manual runs on `windows-installer` build Windows only; pushes and pull requests continue to check both platforms.
+4. In the run summary, select **Download the installer ZIP**, or download **rhelboat-windows-x64** under **Artifacts**. GitHub requires a signed-in account to download artifacts; these downloads expire according to the repository's artifact retention policy.
+5. Extract the ZIP and run `RHELboat-Setup-<version>-x64.exe`. The blockmap beside it is build metadata; it is not the installer.
+
+The workflow installs dependencies from the npm lockfile, checks types, runs the portable tests, builds the installer, tests installation/launch/uninstallation and uploads the installer ZIP. Its summary includes download and rebuild links plus local build commands. See [GitHub's manual workflow instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) for the web interface.
+
 ## Build on Windows
 
 Use Node.js 24+ and npm:
 
 ```powershell
+git clone --branch windows-installer https://github.com/ochoaj92-lgtm/RHELboat.git
+cd RHELboat
 npm ci
 npm run typecheck
 npm test
