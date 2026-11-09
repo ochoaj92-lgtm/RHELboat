@@ -1,0 +1,62 @@
+# Maintainer: ochoaj92-lgtm <ochoa.j92@gmail.com>
+pkgname=rhelboat
+pkgver=0.9.0
+pkgrel=1
+pkgdesc="Enterprise Linux practice, one command at a time. Guided lessons and isolated container labs."
+arch=('x86_64')
+url="https://github.com/ochoaj92-lgtm/RHELboat"
+license=('MIT')
+depends=('electron' 'podman')
+optdepends=(
+    'docker: Alternative container runtime for labs'
+    'qemu-system-x86: Dedicated practice VM for interactive RHEL ISO installation'
+    'qemu-img: Qcow2 virtual disk creation and inspection'
+    'qemu-ui-gtk: GTK display console for QEMU installation VM'
+)
+makedepends=('npm' 'nodejs>=23')
+
+build() {
+    if [ -f "$startdir/package.json" ]; then
+        cd "$startdir"
+    else
+        cd "$srcdir/$pkgname" 2>/dev/null || cd "$srcdir"
+    fi
+
+    npm ci 2>/dev/null || npm install
+    npm run build
+}
+
+package() {
+    if [ -f "$startdir/package.json" ]; then
+        cd "$startdir"
+    else
+        cd "$srcdir/$pkgname" 2>/dev/null || cd "$srcdir"
+    fi
+
+    # Application bundles
+    install -d "$pkgdir/usr/lib/$pkgname"
+    cp -r build/main "$pkgdir/usr/lib/$pkgname/main"
+    cp -r build/renderer "$pkgdir/usr/lib/$pkgname/renderer"
+    cp -r labs "$pkgdir/usr/lib/$pkgname/labs"
+    install -m644 package.json "$pkgdir/usr/lib/$pkgname/package.json"
+
+    # Launcher wrapper script
+    install -Dm755 rhelboat.sh "$pkgdir/usr/bin/$pkgname"
+
+    # Desktop shortcut
+    install -Dm644 rhelboat.desktop "$pkgdir/usr/share/applications/$pkgname.desktop"
+
+    # High-resolution hicolor icon theme
+    for size in 16 24 32 48 64 128 256 512 1024; do
+        if [ -f "icons/png/$size.png" ]; then
+            install -Dm644 "icons/png/$size.png" "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/$pkgname.png"
+        fi
+    done
+    if [ -f "icons/rhelboat.svg" ]; then
+        install -Dm644 "icons/rhelboat.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/$pkgname.svg"
+    fi
+
+    # Upstream license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+

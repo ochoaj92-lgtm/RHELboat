@@ -6,25 +6,9 @@
         "output": "dist"
     },
     "publish": null,
-    "nsis": {
-        "oneClick": false,
-        "perMachine": false,
-        "allowToChangeInstallationDirectory": true,
-        "shortcutName": "RHELboat",
-        "installerIcon": "icons/rhelboat.ico",
-        "uninstallerIcon": "icons/rhelboat.ico",
-        "installerHeaderIcon": "icons/rhelboat.ico",
-        "installerHeader": "icons/installer-header.bmp",
-        "installerSidebar": "icons/installer-sidebar.bmp",
-        "uninstallerSidebar": "icons/installer-sidebar.bmp"
-    },
-    "win": {
-        "target": "nsis",
-        "icon": "icons/rhelboat.ico"
-    },
     "linux": {
         "icon": "icons/png",
-        "target": ["appimage", "deb", "rpm", "tar.bz2"],
+        "target": ["appimage", "deb", "rpm", "pacman", "tar.bz2"],
         "category": "Education",
         "maintainer": "RHELboat contributors",
         "artifactName": "${name}-${version}-${arch}.${ext}",
@@ -58,9 +42,5 @@
             "to": "labs",
             "filter": ["**/*"]
         }
-    ],
-    "mac": {
-        "icon": "icons/rhelboat.icns",
-        "category": "public.app-category.education"
-    }
+    ]
 }

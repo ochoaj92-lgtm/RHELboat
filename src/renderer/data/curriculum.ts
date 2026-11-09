@@ -359,7 +359,7 @@ export const lessons: Lesson[] = [
                 id: "boot-installed-system",
                 title: "Start from the installed disk",
                 instruction:
-                    "After installation finishes, shut down cleanly from inside the guest. Once the VM panel shows it is stopped, choose Boot installed disk so QEMU starts without the ISO attached. Confirm that you reach the new system's login rather than returning to the installer. The virtual disk is persistent; closing RHELboat does not shut down this separate VM process.",
+                    "When package installation finishes, do not choose Reboot System yet: the installation ISO stays attached and would start again. In the QEMU window press Ctrl+Alt+F2 to open the installer shell, run `poweroff`, then wait for the VM panel to show it is stopped. Choose Boot installed disk so QEMU starts without the ISO attached. Confirm that you reach the new system's login rather than returning to the installer. The virtual disk is persistent; closing RHELboat does not shut down this separate VM process.",
             },
             {
                 id: "verify-installed-system",

@@ -1,10 +1,10 @@
 FROM registry.access.redhat.com/ubi10/ubi:latest
 
 RUN dnf -y install bash coreutils-single findutils grep sed gawk shadow-utils procps-ng \
-    util-linux iproute acl tar gzip diffutils vim-minimal less which \
+    util-linux iproute acl tar gzip diffutils vim-minimal less which sudo \
     && dnf clean all \
     && mkdir -p /root/lab
 
 WORKDIR /root/lab
-ENV TERM=dumb
+ENV TERM=xterm-256color
 CMD ["sleep", "infinity"]

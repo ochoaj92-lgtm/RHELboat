@@ -185,7 +185,11 @@ test("real headless QEMU starts a temporary disk and survives backend reconnecti
             const socket = createConnection(join(directory, "control.sock"));
             let ready = false;
             let buffer = "";
-            socket.on("error", error => { if ((error as NodeJS.ErrnoException).code === "ENOENT") resolve(); else reject(error); });
+            socket.on("error", error => {
+                const code = (error as NodeJS.ErrnoException).code;
+                if (code === "ENOENT" || (ready && (code === "ECONNRESET" || code === "EPIPE"))) resolve();
+                else reject(error);
+            });
             socket.on("close", () => resolve());
             socket.on("data", chunk => {
                 buffer += chunk;

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { Terminal } from "xterm";
+import "xterm/css/xterm.css";
 import TrainerIcon from "../components/TrainerIcon.vue";
 import InstallationLab from "../components/InstallationLab.vue";
+import RapidQuiz from "../components/RapidQuiz.vue";
 import { paths, lessons } from "../data/curriculum";
 import type { LabStatus, Runtime, CheckResult } from "../../shared/trainer.js";
 
@@ -19,6 +22,7 @@ const pathIcons: Record<string, string> = {
     rhca: "compass",
 };
 const section = ref("learn");
+const isDark = ref(false);
 const search = ref("");
 const selectedPath = ref(paths[0].id);
 const selectedLesson = ref(paths[0].lessonIds[0]);
@@ -40,12 +44,15 @@ const feedback = ref<CheckResult | null>(null);
 const command = ref("");
 const output = ref("");
 const terminalOutput = ref<HTMLPreElement | null>(null);
+const terminalMount = ref<HTMLDivElement | null>(null);
 const commandInput = ref<HTMLInputElement | null>(null);
 const history: string[] = [];
 let historyIndex = 0;
 let unsubscribe: (() => void) | undefined;
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 let polling = false;
+let term: Terminal | null = null;
+let rawBuffer = "";
 const path = computed(() => paths.find(item => item.id === selectedPath.value)!);
 const pathLessons = computed(() => path.value.lessonIds.map(id => lessons.find(item => item.id === id)!));
 const lesson = computed(() => lessons.find(item => item.id === selectedLesson.value)!);
@@ -94,6 +101,18 @@ watch(selectedLesson, () => {
 watch(stepIndex, () => {
     hintVisible.value = false;
 });
+watch(isDark, dark => {
+    if (term) {
+        term.options.theme = dark
+            ? { background: "#090e17", foreground: "#f1f5f9", cursor: "#e06c75", selectionBackground: "#3e4451" }
+            : { background: "#101820", foreground: "#f8fafc", cursor: "#e06c75", selectionBackground: "#3e4451" };
+    }
+});
+watch(section, val => {
+    if (val === "learn" && isRunning.value) {
+        void nextTick(() => setupTerminal());
+    }
+});
 watch(
     completed,
     value => {
@@ -119,8 +138,50 @@ watch(
     { deep: true },
 );
 
+function setupTerminal() {
+    if (term || !terminalMount.value) return;
+    term = new Terminal({
+        fontFamily: 'ui-monospace, SFMono-Regular, "Cascadia Code", "Fira Code", monospace',
+        fontSize: 13,
+        lineHeight: 1.25,
+        cursorBlink: true,
+        cursorStyle: "block",
+        theme: isDark.value
+            ? {
+                  background: "#090e17",
+                  foreground: "#f1f5f9",
+                  cursor: "#e06c75",
+                  selectionBackground: "#3e4451",
+              }
+            : {
+                  background: "#101820",
+                  foreground: "#f8fafc",
+                  cursor: "#e06c75",
+                  selectionBackground: "#3e4451",
+              },
+    });
+    term.open(terminalMount.value);
+    term.onData(data => {
+        if (api && isRunning.value) {
+            void api.write(data);
+        }
+    });
+    if (rawBuffer) {
+        term.write(rawBuffer);
+    }
+}
+
+function clearTerminal() {
+    output.value = "";
+    rawBuffer = "";
+    term?.reset();
+}
+
 function appendOutput(chunk: string) {
-    // shortcut: line console strips terminal controls; add a terminal emulator for full-screen editors.
+    rawBuffer = (rawBuffer + chunk).slice(-100000);
+    if (term) {
+        term.write(chunk);
+    }
     const text = chunk
         .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
         .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
@@ -146,6 +207,10 @@ onMounted(async () => {
             );
         const savedRuntime = localStorage.getItem("rhelboat.runtime");
         if (savedRuntime === "podman" || savedRuntime === "docker") runtime.value = savedRuntime;
+        const savedTheme = localStorage.getItem("rhelboat.theme");
+        if (savedTheme === "dark" || (!savedTheme && window.matchMedia?.("(prefers-color-scheme: dark)").matches)) {
+            isDark.value = true;
+        }
     } catch {
         /* Ignore invalid or unavailable local storage. */
     }
@@ -172,6 +237,8 @@ onMounted(async () => {
 onUnmounted(() => {
     unsubscribe?.();
     clearInterval(statusTimer);
+    term?.dispose();
+    term = null;
 });
 function showError(error: unknown) {
     status.value = {
@@ -196,7 +263,12 @@ async function startLab() {
         } catch {
             /* Session choice still applies. */
         }
-        if (isRunning.value) void nextTick(() => commandInput.value?.focus());
+        if (isRunning.value) {
+            void nextTick(() => {
+                setupTerminal();
+                commandInput.value?.focus();
+            });
+        }
     } catch (error) {
         showError(error);
     } finally {
@@ -219,7 +291,7 @@ async function resetLab() {
     resetConfirm.value = false;
     busy.value = true;
     feedback.value = null;
-    output.value = "";
+    clearTerminal();
     try {
         status.value = await api.reset(runtime.value);
     } catch (error) {
@@ -290,10 +362,87 @@ function openSource(url: string) {
     if (api) void api.openSource(url).catch(showError);
     else window.open(url, "_blank", "noopener,noreferrer");
 }
+function handleCopyCommand(text: string) {
+    if (navigator.clipboard) {
+        void navigator.clipboard.writeText(text);
+    }
+    if (isRunning.value) {
+        command.value = text;
+        void nextTick(() => commandInput.value?.focus());
+    }
+}
+
+function toggleTheme() {
+    isDark.value = !isDark.value;
+    try {
+        localStorage.setItem("rhelboat.theme", isDark.value ? "dark" : "light");
+    } catch {
+        /* storage unavailable */
+    }
+}
+
+const importInput = ref<HTMLInputElement | null>(null);
+const progressFeedback = ref("");
+
+function exportProgress() {
+    const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        completed: completed.value,
+        installationCheckpoints: installationCheckpoints.value,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rhelboat-progress-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    progressFeedback.value = "Progress exported successfully.";
+}
+
+function triggerImport() {
+    importInput.value?.click();
+}
+
+function handleImport(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const parsed = JSON.parse(String(e.target?.result || "{}"));
+            if (Array.isArray(parsed.completed)) {
+                completed.value = parsed.completed.filter(
+                    (id: unknown): id is string => typeof id === "string" && lessons.some(l => l.id === id),
+                );
+            }
+            if (Array.isArray(parsed.installationCheckpoints)) {
+                installationCheckpoints.value = parsed.installationCheckpoints.filter(
+                    (id: unknown): id is string => typeof id === "string",
+                );
+            }
+            progressFeedback.value = "Progress imported successfully.";
+        } catch {
+            progressFeedback.value = "Failed to import progress file: Invalid JSON format.";
+        }
+    };
+    reader.readAsText(file);
+    input.value = "";
+}
+
+function resetAllProgress() {
+    if (confirm("Are you sure you want to reset all completed lessons and checkpoints? This cannot be undone.")) {
+        completed.value = [];
+        installationCheckpoints.value = [];
+        progressFeedback.value = "All progress has been reset.";
+    }
+}
 </script>
 
 <template>
-    <div class="trainer-shell">
+    <div class="trainer-shell" :class="{ 'dark-theme': isDark }">
         <aside class="sidebar">
             <a class="brand" href="#" @click.prevent="section = 'learn'" aria-label="RHELboat home">
                 <img class="brand-symbol" src="/img/rhelboat.svg" alt="" width="48" height="48" />
@@ -303,6 +452,9 @@ function openSource(url: string) {
             <nav class="main-nav" aria-label="Workspace">
                 <button :class="{ active: section === 'learn' }" @click="section = 'learn'">
                     <TrainerIcon name="book" />Learning paths<span class="nav-count">{{ paths.length }}</span>
+                </button>
+                <button :class="{ active: section === 'quiz' }" @click="section = 'quiz'">
+                    <TrainerIcon name="shield" />Rapid Quiz<span class="nav-count">Sim</span>
                 </button>
                 <button :class="{ active: section === 'progress' }" @click="section = 'progress'">
                     <TrainerIcon name="chart" />My progress
@@ -350,10 +502,31 @@ function openSource(url: string) {
             <header class="workspace-header">
                 <div class="breadcrumb">
                     <span>RHELboat</span><TrainerIcon name="chevron" /><strong>{{
-                        section === "learn" ? "Learning paths" : section === "progress" ? "My progress" : "Lab setup"
+                        section === "learn"
+                            ? "Learning paths"
+                            : section === "quiz"
+                              ? "Rapid Simulation Quiz"
+                              : section === "progress"
+                                ? "My progress"
+                                : "Lab setup"
                     }}</strong>
                 </div>
                 <div class="header-right">
+                    <button
+                        v-if="section === 'learn'"
+                        class="button subtle quick-quiz-launch"
+                        title="Take a quick retention quiz on this topic"
+                        @click="section = 'quiz'"
+                    >
+                        <TrainerIcon name="shield" />Quiz Topic
+                    </button>
+                    <button
+                        class="button subtle theme-toggle-btn"
+                        :title="isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'"
+                        @click="toggleTheme"
+                    >
+                        <TrainerIcon name="compass" />{{ isDark ? "Light" : "Dark" }}
+                    </button>
                     <span class="local-badge"
                         ><span class="status-dot" :class="{ online: isRunning }"></span
                         >{{ isRunning ? "Lab running" : "Local workspace" }}</span
@@ -595,9 +768,9 @@ function openSource(url: string) {
                             <span
                                 ><span class="terminal-tab-dot"></span>root@rhelboat
                                 <span class="terminal-tab-close">bash</span></span
-                            ><button :disabled="!output" @click="output = ''">Clear output</button>
+                            ><button :disabled="!output && !rawBuffer" @click="clearTerminal">Clear output</button>
                         </div>
-                        <div v-if="!isRunning && !output" class="terminal-welcome">
+                        <div v-if="!isRunning && !output && !rawBuffer" class="terminal-welcome">
                             <div class="terminal-art">
                                 <img src="/img/rhelboat.svg" alt="" width="84" height="84" />
                             </div>
@@ -624,14 +797,13 @@ function openSource(url: string) {
                                 ><span><TrainerIcon name="reset" />Reset anytime</span>
                             </div>
                         </div>
-                        <pre
+                        <div
                             v-else
-                            ref="terminalOutput"
-                            class="terminal-output"
+                            ref="terminalMount"
+                            class="terminal-output xterm-screen"
                             aria-label="Shell output"
                             tabindex="0"
-                            >{{ output || "Connecting to your shell…\n" }}</pre
-                        >
+                        ></div>
                         <form v-if="isRunning" class="terminal-input" @submit.prevent="sendCommand">
                             <span>#</span
                             ><input
@@ -687,6 +859,15 @@ function openSource(url: string) {
                 </footer>
             </template>
 
+            <RapidQuiz
+                v-else-if="section === 'quiz'"
+                :current-path-id="selectedPath"
+                :current-lesson-id="selectedLesson"
+                :completed-lesson-ids="completed"
+                @select-lesson="id => selectedLesson = id"
+                @copy-command="handleCopyCommand"
+            />
+
             <section v-else-if="section === 'progress'" class="utility-page">
                 <div class="eyebrow">EVERY STEP COUNTS</div>
                 <h1>Your learning, at a glance.</h1>
@@ -696,6 +877,37 @@ function openSource(url: string) {
                         >{{ totalComplete }}<span> / {{ lessons.length }}</span></strong
                     ><span>unique lessons complete</span>
                 </div>
+
+                <div class="progress-management-bar">
+                    <div class="manage-text">
+                        <strong>Manage Training Data</strong>
+                        <p>Export your achievements and checkpoints as a JSON backup, or import to restore on a new machine.</p>
+                        <span v-if="progressFeedback" class="progress-feedback-msg">{{ progressFeedback }}</span>
+                    </div>
+                    <div class="manage-actions">
+                        <button class="button subtle" @click="exportProgress">
+                            <TrainerIcon name="copy" />Export (.json)
+                        </button>
+                        <button class="button subtle" @click="triggerImport">
+                            <TrainerIcon name="arrow" />Import (.json)
+                        </button>
+                        <input
+                            ref="importInput"
+                            type="file"
+                            accept=".json,application/json"
+                            style="display: none"
+                            @change="handleImport"
+                        />
+                        <button
+                            class="button danger"
+                            :disabled="!totalComplete && !installationCheckpoints.length"
+                            @click="resetAllProgress"
+                        >
+                            <TrainerIcon name="reset" />Reset
+                        </button>
+                    </div>
+                </div>
+
                 <div class="progress-grid">
                     <article v-for="item in paths" :key="item.id">
                         <span class="exam-badge">{{ item.code }}</span>

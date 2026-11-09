@@ -16,8 +16,11 @@
         "./main.ts",
         "./App.vue",
         "./views/Trainer.vue",
+        "./components/InstallationLab.vue",
+        "./components/RapidQuiz.vue",
         "./components/TrainerIcon.vue",
         "./data/curriculum.ts",
+        "./data/quiz.ts",
         "./window.d.ts",
         "./vite-env.d.ts"
     ]

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=RHELboat
+GenericName=Enterprise Linux Training Lab
+Comment=Step-by-step Enterprise Linux practice with local container labs
+Exec=rhelboat %U
+Terminal=false
+Type=Application
+Icon=rhelboat
+StartupWMClass=RHELboat
+Categories=Education;Development;System;
+Keywords=linux;training;rhcsa;rhce;certification;podman;docker;rhel;
+

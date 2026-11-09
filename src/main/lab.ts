@@ -10,14 +10,14 @@ const LABEL_KEY = "io.rhelboat.lab";
 const LABEL_VALUE = "v1";
 
 const checks: Record<string, string> = {
-    navigation: "test -f /root/lab/notes.txt && grep -Fqx 'enterprise linux' /root/lab/notes.txt",
-    permissions: 'test -f /root/lab/private.txt && test "$(stat -c %a /root/lab/private.txt)" = 600',
-    users: "getent group operators >/dev/null && id -nG trainee | tr ' ' '\\n' | grep -qx operators",
-    processes: "pgrep -x sleep | grep -qv '^1$'",
-    archive: "tar -tzf /root/lab/backup.tar.gz | grep -Eq '^(\\./)?notes\\.txt$'",
-    links: 'test -L /root/lab/latest && test "$(readlink -f /root/lab/latest)" = /root/lab/notes.txt && test -f /root/lab/latest',
-    text: 'test -f /root/lab/errors.log && test "$(grep -c ERROR /root/lab/errors.log)" = 2',
-    scripting: "test -x /root/lab/hello.sh && test \"$(/root/lab/hello.sh)\" = 'hello enterprise linux'",
+    navigation: "if [ ! -f /root/lab/notes.txt ]; then echo 'Missing /root/lab/notes.txt file.'; exit 1; fi; grep -Fqx 'enterprise linux' /root/lab/notes.txt || { echo '/root/lab/notes.txt does not contain exact line \"enterprise linux\".'; exit 1; }",
+    permissions: 'if [ ! -f /root/lab/private.txt ]; then echo \'Missing /root/lab/private.txt file.\'; exit 1; fi; mode=$(stat -c %a /root/lab/private.txt); if [ "$mode" != "600" ]; then echo "File permissions are $mode, expected 600."; exit 1; fi',
+    users: "if ! getent group operators >/dev/null; then echo \"Group 'operators' does not exist.\"; exit 1; fi; id -nG trainee 2>/dev/null | tr ' ' '\\n' | grep -qx operators || { echo \"User 'trainee' is not in group 'operators'.\"; exit 1; }",
+    processes: "pgrep -x sleep | grep -qv '^1$' || { echo 'No background sleep process found.'; exit 1; }",
+    archive: "if [ ! -f /root/lab/backup.tar.gz ]; then echo 'Missing /root/lab/backup.tar.gz file.'; exit 1; fi; tar -tzf /root/lab/backup.tar.gz 2>/dev/null | grep -Eq '^(\\./)?notes\\.txt$' || { echo 'Archive does not contain notes.txt.'; exit 1; }",
+    links: "if [ ! -L /root/lab/latest ]; then echo '/root/lab/latest is not a symbolic link.'; exit 1; fi; target=$(readlink -f /root/lab/latest 2>/dev/null); if [ \"$target\" != \"/root/lab/notes.txt\" ]; then echo \"Link points to '$target', expected '/root/lab/notes.txt'.\"; exit 1; fi; test -f /root/lab/latest || { echo 'Link target does not exist.'; exit 1; }",
+    text: "if [ ! -f /root/lab/errors.log ]; then echo 'Missing /root/lab/errors.log file.'; exit 1; fi; count=$(grep -c ERROR /root/lab/errors.log 2>/dev/null || echo 0); if [ \"$count\" != \"2\" ]; then echo \"Found $count lines matching ERROR, expected 2.\"; exit 1; fi",
+    scripting: "if [ ! -f /root/lab/hello.sh ]; then echo 'Missing /root/lab/hello.sh script.'; exit 1; fi; if [ ! -x /root/lab/hello.sh ]; then echo '/root/lab/hello.sh is not executable (chmod +x).'; exit 1; fi; out=$(/root/lab/hello.sh 2>&1); if [ \"$out\" != \"hello enterprise linux\" ]; then echo \"Script output was '$out', expected 'hello enterprise linux'.\"; exit 1; fi",
 };
 
 export const supportedCheckIds = Object.keys(checks);
@@ -193,7 +193,7 @@ export class ContainerLab {
                 "exec",
                 "--interactive",
                 "--env",
-                "TERM=dumb",
+                "TERM=xterm-256color",
                 "--env",
                 "PS1=[root@rhelboat \\W]# ",
                 "--workdir",
@@ -247,11 +247,13 @@ export class ContainerLab {
             await this.run(this.runtime, ["exec", CONTAINER, "/bin/bash", "-lc", checks[checkId]], 10_000);
             return { passed: true, message: "Objective verified in your container. Well done." };
         } catch (error) {
-            const details = error as { code?: unknown };
+            const details = error as { code?: unknown; stdout?: string; stderr?: string };
+            const hint = String(details.stdout || details.stderr || "").trim();
             if (typeof details.code === "number")
                 return {
                     passed: false,
                     message:
+                        hint ||
                         "The objective is not complete yet. Review the steps, inspect your result, then check again.",
                 };
             throw error;

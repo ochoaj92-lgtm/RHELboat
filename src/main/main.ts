@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ContainerLab } from "./lab.js";
@@ -10,14 +11,17 @@ if (process.platform === "linux") app.setDesktopName("rhelboat.desktop");
 let mainWindow: BrowserWindow | null = null;
 let lab: ContainerLab;
 let closing = false;
-const developmentUrl = "http://localhost:8080";
+const developmentUrl = process.argv[2] ? `http://localhost:${process.argv[2]}` : "http://localhost:8080";
 
 function createWindow() {
-    mainWindow = new BrowserWindow({
+    const appDir = app.getAppPath();
+    const iconPath = existsSync(join(appDir, "renderer", "img", "rhelboat.png"))
+        ? join(appDir, "renderer", "img", "rhelboat.png")
+        : join(dirname(fileURLToPath(import.meta.url)), "../../src/renderer/public/img/rhelboat.png");
+
+    const window = new BrowserWindow({
         title: "RHELboat · Enterprise Linux Training Lab",
-        icon: app.isPackaged
-            ? join(app.getAppPath(), "renderer", "img", "rhelboat.png")
-            : join(dirname(fileURLToPath(import.meta.url)), "../../src/renderer/public/img/rhelboat.png"),
+        icon: iconPath,
         width: 1480,
         height: 940,
         minWidth: 1000,
@@ -31,29 +35,45 @@ function createWindow() {
             sandbox: true,
         },
     });
-    mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    mainWindow.webContents.on("will-navigate", event => event.preventDefault());
-    mainWindow.on("close", event => {
+    mainWindow = window;
+    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    window.webContents.on("will-navigate", event => event.preventDefault());
+    window.webContents.on("did-finish-load", () => console.log("[main] Window finished loading"));
+    window.webContents.on("did-fail-load", (_event, code, desc) => console.error("[main] Window failed to load:", code, desc));
+    window.on("close", event => {
+        console.log("[main] Window close requested, closing =", closing);
         if (!closing) {
             event.preventDefault();
             closing = true;
             void lab.stop().finally(() => app.quit());
         }
     });
+    window.on("closed", () => console.log("[main] Window closed event emitted"));
     if (!app.isPackaged && process.env.NODE_ENV === "development") {
-        void mainWindow.loadURL(developmentUrl);
+        console.log("[main] Loading dev URL:", developmentUrl);
+        void window.loadURL(developmentUrl);
     } else {
-        void mainWindow.loadFile(join(app.getAppPath(), "renderer", "index.html"));
+        const indexPath = existsSync(join(appDir, "renderer", "index.html"))
+            ? join(appDir, "renderer", "index.html")
+            : join(dirname(fileURLToPath(import.meta.url)), "../renderer/index.html");
+        console.log("[main] Loading file path:", indexPath);
+        void window.loadFile(indexPath);
     }
 }
 
 if (!app.requestSingleInstanceLock()) {
+    console.log("[main] Another instance is already running; quitting.");
     app.quit();
 } else {
+    console.log("[main] Acquired single instance lock, waiting for app.whenReady()...");
     app.whenReady().then(() => {
-        const contextDir = app.isPackaged
+        console.log("[main] app.whenReady resolved");
+        const appDir = app.getAppPath();
+        const contextDir = existsSync(join(process.resourcesPath, "labs"))
             ? join(process.resourcesPath, "labs")
-            : join(dirname(fileURLToPath(import.meta.url)), "../../labs");
+            : existsSync(join(appDir, "labs"))
+              ? join(appDir, "labs")
+              : join(dirname(fileURLToPath(import.meta.url)), "../../labs");
         lab = new ContainerLab(contextDir, output => {
             if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("lab:output", output);
         });

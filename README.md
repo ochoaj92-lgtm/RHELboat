@@ -19,7 +19,7 @@ RHELboat guides you through installing a real RHEL system from an official ISO, 
 | Guided learning                                   | Hands-on practice                                          | Your own workspace                                                          |
 | ------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
 | 18 original lessons across 10 certification paths | Eight container labs with checks against the actual result | Local progress, persistent lab files, and reset when you need a fresh start |
-| Clear objectives and optional command hints       | Real Bash through Podman or Docker                         | RHEL installation VM plus marked full-system guides                         |
+| Rapid simulation quizzes on active & completed topics | Real Bash through Podman or Docker                         | RHEL installation VM plus marked full-system guides                         |
 
 The checked labs cover shell navigation, permissions, users and groups, processes, archives, symbolic links, text processing, and scripting. Ten additional guides cover the RHEL installation workflow and introduce full-system and specialist topics, with official references linked from each lesson.
 
@@ -33,6 +33,18 @@ cd RHELboat
 npm install
 npm run dev
 ```
+
+### Install on Arch Linux (pacman & makepkg)
+
+You can build and install directly with Arch Linux's `makepkg` and `pacman`:
+
+```sh
+git clone https://github.com/ochoaj92-lgtm/RHELboat.git
+cd RHELboat
+makepkg -si
+```
+
+This packages RHELboat against your system's Electron, installs desktop integration and icons, and enables launching with `rhelboat`.
 
 Bun 1.3+ can install the existing lockfile with `bun install --frozen-lockfile`; the app scripts use Node.js.
 

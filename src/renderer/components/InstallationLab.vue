@@ -223,8 +223,9 @@ async function shutdown() {
             <section class="installation-card">
                 <h4><span>03</span> Practice in the installer</h4>
                 <p>
-                    Start with the ISO. After installation, shut down inside the guest, wait for the VM to stop, and
-                    boot the installed disk.
+                    Start with the ISO. After installation, open the installer shell with Ctrl+Alt+F2 and run
+                    <code>poweroff</code>. Wait for the VM to stop, then boot the installed disk; choosing Reboot System
+                    first would start the still-attached ISO again.
                 </p>
                 <div class="vm-actions">
                     <button
