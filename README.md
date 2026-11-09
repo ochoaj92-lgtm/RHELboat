@@ -8,7 +8,9 @@
 
 RHELboat guides you through installing a real RHEL system from an official ISO, then puts Linux lessons beside an isolated container shell. Follow the next step, practice it, and inspect the result.
 
-[Get started](#run-rhelboat) · [Learning paths](#learning-paths) · [Contribute](CONTRIBUTING.md) · [Brand assets](docs/BRANDING.md)
+[Get started](#run-rhelboat) · [Windows builder](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml?query=branch%3Awindows-installer) · [Build instructions](#build-the-windows-installer-on-github) · [Learning paths](#learning-paths) · [Contribute](CONTRIBUTING.md) · [Brand assets](docs/BRANDING.md)
+
+[![Build RHELboat](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml/badge.svg?branch=windows-installer)](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml?query=branch%3Awindows-installer)
 
 ![RHELboat workspace showing step-by-step instructions beside the Linux lab shell](docs/assets/workspace.png)
 
@@ -22,6 +24,20 @@ RHELboat guides you through installing a real RHEL system from an official ISO, 
 | Rapid simulation quizzes on active & completed topics | Real Bash through Podman or Docker                         | RHEL installation VM plus marked full-system guides                         |
 
 The checked labs cover shell navigation, permissions, users and groups, processes, archives, symbolic links, text processing, and scripting. Ten additional guides cover the RHEL installation workflow and introduce full-system and specialist topics, with official references linked from each lesson.
+
+## Build the Windows installer on GitHub
+
+**[Open the Windows installer builder](https://github.com/ochoaj92-lgtm/RHELboat/actions/workflows/release.yml?query=branch%3Awindows-installer)**
+
+GitHub builds the installer on a hosted Windows runner, checks the app, and tests installation, launch and uninstallation. You do not need local build tools.
+
+1. Open the builder and sign in to GitHub. Starting a build requires write access to this repository; other users can download a completed build or fork the repository with all branches to build their own copy.
+2. Select **Run workflow** and choose **windows-installer** in the **Branch** dropdown. The default branch currently contains the older Linux-only workflow.
+3. Select **Run workflow** to start the Windows-only build, then open the new run.
+4. Wait for the **windows** job to succeed. In the run summary, use **Download the installer ZIP**, or download **rhelboat-windows-x64** under **Artifacts**. Artifact downloads require a signed-in GitHub account and are available until they expire.
+5. Extract the ZIP and run `RHELboat-Setup-<version>-x64.exe`. Builds are currently unsigned. Container labs separately require Docker Desktop with Linux containers; RHEL VM lessons use an external VM on Windows.
+
+On `windows-installer`, pushes and pull requests also build and test both Linux and Windows. See the [Windows build and setup guide](https://github.com/ochoaj92-lgtm/RHELboat/blob/windows-installer/docs/WINDOWS.md) for local build commands and prerequisites.
 
 ## Run RHELboat
 
