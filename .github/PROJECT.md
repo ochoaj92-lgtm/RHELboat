@@ -4,13 +4,13 @@ Repository: [ochoaj92-lgtm/RHELboat](https://github.com/ochoaj92-lgtm/RHELboat)
 
 These are the intended GitHub presentation settings. This file records the configuration; it does not apply remote settings or confirm their current state.
 
-| Setting           | Value                                                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Display name      | RHELboat · Enterprise Linux Training Lab                                                                                                    |
-| About description | Enterprise Linux practice, one command at a time. Guided certification lessons beside an isolated Podman or Docker lab.                     |
-| Website           | `https://github.com/ochoaj92-lgtm/RHELboat#run-rhelboat`                                                                                    |
-| Topics            | `rhel`, `enterprise-linux`, `linux-training`, `rhcsa`, `rhce`, `rhca`, `certification`, `podman`, `docker`, `electron`, `vue`, `typescript` |
-| Social preview    | [`docs/assets/social-preview.png`](../docs/assets/social-preview.png)                                                                       |
+| Setting           | Value                                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Display name      | RHELboat · Enterprise Linux Training Lab                                                                                               |
+| About description | Enterprise Linux practice, one command at a time. Workbook topic lessons beside an isolated Podman or Docker lab.                      |
+| Website           | `https://github.com/ochoaj92-lgtm/RHELboat#run-rhelboat`                                                                               |
+| Topics            | `rhel`, `enterprise-linux`, `linux-training`, `linux-administration`, `workbooks`, `podman`, `docker`, `electron`, `vue`, `typescript` |
+| Social preview    | [`docs/assets/social-preview.png`](../docs/assets/social-preview.png)                                                                  |
 
 GitHub's About panel is edited from the repository home page. The social-preview image is set in the repository's General settings. Repository names cannot include a separate display subtitle; the README and artwork carry the full product title.
 

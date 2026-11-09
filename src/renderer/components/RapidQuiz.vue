@@ -1,26 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import TrainerIcon from "./TrainerIcon.vue";
-import { quizQuestions, type QuizQuestion } from "../data/quiz";
-import { paths, lessons } from "../data/curriculum";
+import { questionsFor, type QuizQuestion, type QuizTarget } from "../data/quiz";
+import { categories, lessons } from "../data/curriculum";
 
 const props = defineProps<{
-    currentPathId?: string;
+    currentCategoryId?: string;
     currentLessonId?: string;
     completedLessonIds: string[];
-}>();
-
-const emit = defineEmits<{
-    (e: "select-lesson", lessonId: string): void;
-    (e: "copy-command", command: string): void;
 }>();
 
 type QuizState = "config" | "active" | "summary";
 
 const state = ref<QuizState>("config");
-const target = ref<"current" | "completed" | "rhcsa" | "rhce" | "security" | "all">("current");
+const target = ref<QuizTarget>("current");
 const questionCount = ref<number>(5);
-const timed = ref<boolean>(false);
 
 const activeQuestions = ref<QuizQuestion[]>([]);
 const currentIndex = ref<number>(0);
@@ -44,37 +38,17 @@ onMounted(() => {
 });
 
 const currentLesson = computed(() => lessons.find(l => l.id === props.currentLessonId));
-const currentPath = computed(() => paths.find(p => p.id === props.currentPathId));
+const currentCategory = computed(() => categories.find(p => p.id === props.currentCategoryId));
 
-const availablePool = computed(() => {
-    if (target.value === "current") {
-        const topic = currentLesson.value?.topic?.toLowerCase() || "";
-        const pathId = props.currentPathId || "rhcsa";
-        const matched = quizQuestions.filter(
-            q => q.pathId === pathId || (topic && q.topic.toLowerCase().includes(topic)),
-        );
-        return matched.length >= 3 ? matched : quizQuestions;
-    }
-    if (target.value === "completed") {
-        if (!props.completedLessonIds.length) return quizQuestions;
-        const completedTopics = lessons
-            .filter(l => props.completedLessonIds.includes(l.id))
-            .map(l => l.topic.toLowerCase());
-        const matched = quizQuestions.filter(q =>
-            completedTopics.some(t => q.topic.toLowerCase().includes(t)),
-        );
-        return matched.length >= 3 ? matched : quizQuestions;
-    }
-    if (target.value === "rhcsa") return quizQuestions.filter(q => q.pathId === "rhcsa");
-    if (target.value === "rhce") return quizQuestions.filter(q => q.pathId === "rhce");
-    if (target.value === "security") return quizQuestions.filter(q => q.pathId === "security");
-    return quizQuestions;
-});
+const availablePool = computed(() =>
+    questionsFor(target.value, props.currentLessonId, props.currentCategoryId, props.completedLessonIds),
+);
 
 const currentQuestion = computed(() => activeQuestions.value[currentIndex.value]);
 
 function startQuiz() {
     const pool = [...availablePool.value];
+    if (!pool.length) return;
     // Shuffle pool
     for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -132,27 +106,20 @@ function finishQuiz() {
         /* Local storage unavailable */
     }
 }
-
-function copyCommand(cmd?: string) {
-    if (!cmd) return;
-    emit("copy-command", cmd);
-}
 </script>
 
 <template>
-    <section class="rapid-quiz-container" aria-label="Rapid Simulation Quiz">
+    <section class="rapid-quiz-container" aria-label="Workbook topic quiz">
         <!-- Configuration View -->
         <div v-if="state === 'config'" class="quiz-config-view">
-            <div class="eyebrow">ACTIVE RETENTION & EXAM SIMULATION</div>
+            <div class="eyebrow">WORKBOOK TOPIC REVIEW</div>
             <h1>Rapid Knowledge Check.</h1>
-            <p>
-                Simulate Red Hat exam scenarios and test command recall on topics you are currently learning or completed.
-            </p>
+            <p>Review concepts from the workbook topics you are learning or have completed.</p>
 
             <div class="quiz-stats-bar">
                 <div>
                     <span class="stat-number">{{ totalQuizzesTaken }}</span>
-                    <span class="stat-label">Simulations Completed</span>
+                    <span class="stat-label">Quizzes Completed</span>
                 </div>
                 <div>
                     <span class="stat-number">{{ highestScore }}%</span>
@@ -167,14 +134,16 @@ function copyCommand(cmd?: string) {
             <div class="quiz-setup-grid">
                 <!-- Environment / Target -->
                 <div class="config-card">
-                    <h3><TrainerIcon name="compass" />Select Quiz Target</h3>
-                    <p class="config-desc">Choose which topics the simulator should pull from:</p>
+                    <h3><TrainerIcon name="compass" />Choose Review Topics</h3>
+                    <p class="config-desc">Choose which topics the quiz should use:</p>
                     <div class="options-group">
                         <label class="radio-card" :class="{ selected: target === 'current' }">
                             <input v-model="target" type="radio" value="current" />
                             <div>
                                 <strong>Current Lesson Topic</strong>
-                                <small v-if="currentLesson">{{ currentLesson.title }} ({{ currentLesson.topic }})</small>
+                                <small v-if="currentLesson"
+                                    >{{ currentLesson.title }} ({{ currentLesson.topic }})</small
+                                >
                                 <small v-else>Active workspace lesson</small>
                             </div>
                         </label>
@@ -195,27 +164,18 @@ function copyCommand(cmd?: string) {
                             </div>
                         </label>
 
-                        <label class="radio-card" :class="{ selected: target === 'rhcsa' }">
-                            <input v-model="target" type="radio" value="rhcsa" />
+                        <label class="radio-card" :class="{ selected: target === 'category' }">
+                            <input v-model="target" type="radio" value="category" />
                             <div>
-                                <strong>RHCSA (EX200) Focus</strong>
-                                <small>Core administration, storage, users, processes</small>
-                            </div>
-                        </label>
-
-                        <label class="radio-card" :class="{ selected: target === 'rhce' }">
-                            <input v-model="target" type="radio" value="rhce" />
-                            <div>
-                                <strong>RHCE Diagnostics (EX342)</strong>
-                                <small>Troubleshooting, crash dumps, sockets, systemd</small>
+                                <strong>Current Category</strong><small>{{ currentCategory?.title }}</small>
                             </div>
                         </label>
 
                         <label class="radio-card" :class="{ selected: target === 'all' }">
                             <input v-model="target" type="radio" value="all" />
                             <div>
-                                <strong>Comprehensive Red Hat Mix</strong>
-                                <small>Randomized mix across all certification paths</small>
+                                <strong>All Workbook Topics</strong>
+                                <small>Randomized review across every training category</small>
                             </div>
                         </label>
                     </div>
@@ -223,30 +183,18 @@ function copyCommand(cmd?: string) {
 
                 <!-- Simulation Settings -->
                 <div class="config-card">
-                    <h3><TrainerIcon name="settings" />Simulation Parameters</h3>
-                    
+                    <h3><TrainerIcon name="settings" />Quiz Length</h3>
+
                     <div class="param-row">
                         <label>Drill Length</label>
                         <div class="pill-selector">
-                            <button
-                                type="button"
-                                :class="{ active: questionCount === 5 }"
-                                @click="questionCount = 5"
-                            >
+                            <button type="button" :class="{ active: questionCount === 5 }" @click="questionCount = 5">
                                 5 Questions (Rapid)
                             </button>
-                            <button
-                                type="button"
-                                :class="{ active: questionCount === 10 }"
-                                @click="questionCount = 10"
-                            >
+                            <button type="button" :class="{ active: questionCount === 10 }" @click="questionCount = 10">
                                 10 Questions (Standard)
                             </button>
-                            <button
-                                type="button"
-                                :class="{ active: questionCount === 15 }"
-                                @click="questionCount = 15"
-                            >
+                            <button type="button" :class="{ active: questionCount === 15 }" @click="questionCount = 15">
                                 15 Questions (Sprint)
                             </button>
                         </div>
@@ -255,16 +203,22 @@ function copyCommand(cmd?: string) {
                     <div class="simulation-overview">
                         <div class="overview-item">
                             <TrainerIcon name="shield" />
-                            <span>Instant rationale explaining official Red Hat best practices</span>
+                            <span>An explanation of each answer and its purpose</span>
                         </div>
                         <div class="overview-item">
                             <TrainerIcon name="terminal" />
-                            <span>Executable command hints ready to test in your UBI 10 shell</span>
+                            <span>Practice the related task in its marked container or VM lab</span>
                         </div>
                     </div>
 
-                    <button class="button primary start-quiz-btn" @click="startQuiz">
-                        <TrainerIcon name="play" />Start Simulation ({{ Math.min(questionCount, availablePool.length) }} Questions)
+                    <p v-if="!availablePool.length" role="status">
+                        No questions match this selection yet. Choose another review group.
+                    </p>
+                    <button class="button primary start-quiz-btn" :disabled="!availablePool.length" @click="startQuiz">
+                        <TrainerIcon name="play" />Start Quiz ({{
+                            Math.min(questionCount, availablePool.length)
+                        }}
+                        Questions)
                     </button>
                 </div>
             </div>
@@ -283,8 +237,10 @@ function copyCommand(cmd?: string) {
                     </div>
                 </div>
                 <div class="quiz-badge">
-                    <span class="topic-tag">{{ currentQuestion.topicLabel }}</span>
-                    <span class="diff-tag">{{ currentQuestion.difficulty }}</span>
+                    <span class="topic-tag">{{
+                        lessons.find(item => item.id === currentQuestion.lessonId)?.topic
+                    }}</span>
+                    <span class="diff-tag">{{ "Topic review" }}</span>
                 </div>
             </header>
 
@@ -313,44 +269,40 @@ function copyCommand(cmd?: string) {
                         :disabled="answered"
                         @click="selectOption(idx)"
                     >
-                        <span class="option-prefix">{{ ['A', 'B', 'C', 'D'][idx] }}</span>
+                        <span class="option-prefix">{{ ["A", "B", "C", "D"][idx] }}</span>
                         <code class="option-content">{{ option }}</code>
                         <span v-if="answered && idx === currentQuestion.correctIndex" class="verdict-icon correct">
                             <TrainerIcon name="check" />
                         </span>
-                        <span v-else-if="answered && selectedAnswer === idx && idx !== currentQuestion.correctIndex" class="verdict-icon incorrect">
+                        <span
+                            v-else-if="answered && selectedAnswer === idx && idx !== currentQuestion.correctIndex"
+                            class="verdict-icon incorrect"
+                        >
                             ×
                         </span>
                     </button>
                 </div>
 
                 <!-- Explanation / Feedback Panel -->
-                <div v-if="answered" class="explanation-box" :class="{ correct: selectedAnswer === currentQuestion.correctIndex }">
+                <div
+                    v-if="answered"
+                    class="explanation-box"
+                    :class="{ correct: selectedAnswer === currentQuestion.correctIndex }"
+                >
                     <div class="explanation-header">
                         <TrainerIcon :name="selectedAnswer === currentQuestion.correctIndex ? 'check' : 'info'" />
                         <strong>
-                            {{ selectedAnswer === currentQuestion.correctIndex ? 'Correct!' : 'Incorrect' }}
+                            {{ selectedAnswer === currentQuestion.correctIndex ? "Correct!" : "Incorrect" }}
                         </strong>
                     </div>
                     <p>{{ currentQuestion.explanation }}</p>
-                    <div v-if="currentQuestion.recommendedCommand" class="command-tip">
-                        <span>Practice command:</span>
-                        <code>{{ currentQuestion.recommendedCommand }}</code>
-                        <button class="button subtle copy-tip-btn" @click="copyCommand(currentQuestion.recommendedCommand)">
-                            <TrainerIcon name="copy" />Copy
-                        </button>
-                    </div>
                 </div>
             </article>
 
             <footer class="quiz-footer">
                 <button class="button subtle" @click="state = 'config'">Abort Quiz</button>
-                <button
-                    v-if="answered"
-                    class="button dark next-btn"
-                    @click="nextQuestion"
-                >
-                    {{ currentIndex === activeQuestions.length - 1 ? 'View Score' : 'Next Question' }}
+                <button v-if="answered" class="button dark next-btn" @click="nextQuestion">
+                    {{ currentIndex === activeQuestions.length - 1 ? "View Score" : "Next Question" }}
                     <TrainerIcon name="arrow" />
                 </button>
             </footer>
@@ -358,7 +310,7 @@ function copyCommand(cmd?: string) {
 
         <!-- Summary Scorecard View -->
         <div v-else-if="state === 'summary'" class="quiz-summary-view">
-            <div class="eyebrow">SIMULATION RESULTS</div>
+            <div class="eyebrow">QUIZ RESULTS</div>
             <h1>Performance Breakdown</h1>
 
             <div class="score-card">
@@ -372,24 +324,22 @@ function copyCommand(cmd?: string) {
                             score === activeQuestions.length
                                 ? "Flawless Performance!"
                                 : score / activeQuestions.length >= 0.8
-                                ? "Enterprise Ready."
-                                : "Good Effort — Keep Drilling."
+                                  ? "Strong recall."
+                                  : "Good Effort — Keep Drilling."
                         }}
                     </h2>
                     <p>
                         {{
                             score === activeQuestions.length
-                                ? "You showed mastery of these Enterprise Linux concepts. Ready to tackle live container labs."
-                                : "Review the question breakdowns below and test any unfamiliar syntax directly in your lab shell."
+                                ? "You recalled these concepts. Practice the related tasks to test how you apply them."
+                                : "Review the question breakdowns below and practice unfamiliar tools in the environment marked for the related lesson."
                         }}
                     </p>
                     <div class="summary-actions">
                         <button class="button primary" @click="startQuiz">
                             <TrainerIcon name="reset" />Retry This Quiz
                         </button>
-                        <button class="button secondary" @click="state = 'config'">
-                            New Configuration
-                        </button>
+                        <button class="button secondary" @click="state = 'config'">New Configuration</button>
                     </div>
                 </div>
             </div>
@@ -406,15 +356,20 @@ function copyCommand(cmd?: string) {
                     <div class="review-header">
                         <span class="review-status">
                             <TrainerIcon :name="ans.correct ? 'check' : 'info'" />
-                            Question {{ idx + 1 }}: {{ ans.correct ? 'Correct' : 'Missed' }}
+                            Question {{ idx + 1 }}: {{ ans.correct ? "Correct" : "Missed" }}
                         </span>
-                        <span class="review-topic">{{ activeQuestions[idx]?.topicLabel }}</span>
+                        <span class="review-topic">{{
+                            lessons.find(item => item.id === activeQuestions[idx]?.lessonId)?.topic
+                        }}</span>
                     </div>
                     <p class="review-q">{{ activeQuestions[idx]?.question }}</p>
                     <div class="review-ans">
-                        <span>Your answer: <code>{{ activeQuestions[idx]?.options[ans.selected] }}</code></span>
+                        <span
+                            >Your answer: <code>{{ activeQuestions[idx]?.options[ans.selected] }}</code></span
+                        >
                         <span v-if="!ans.correct" class="correct-ans">
-                            Correct: <code>{{ activeQuestions[idx]?.options[activeQuestions[idx]?.correctIndex] }}</code>
+                            Correct:
+                            <code>{{ activeQuestions[idx]?.options[activeQuestions[idx]?.correctIndex] }}</code>
                         </span>
                     </div>
                 </div>
@@ -422,4 +377,3 @@ function copyCommand(cmd?: string) {
         </div>
     </section>
 </template>
-

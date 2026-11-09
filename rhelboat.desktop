@@ -8,5 +8,5 @@ Type=Application
 Icon=rhelboat
 StartupWMClass=RHELboat
 Categories=Education;Development;System;
-Keywords=linux;training;rhcsa;rhce;certification;podman;docker;rhel;
+Keywords=linux;training;administration;workbooks;podman;docker;rhel;
 

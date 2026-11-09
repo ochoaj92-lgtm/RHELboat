@@ -15,7 +15,7 @@
         "desktop": {
             "entry": {
                 "Comment": "Step-by-step Enterprise Linux practice with local container labs",
-                "Keywords": "linux;training;rhcsa;rhce;certification;podman;docker;"
+                "Keywords": "linux;training;administration;workbooks;podman;docker;"
             }
         },
         "executableName": "rhelboat",

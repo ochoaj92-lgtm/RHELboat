@@ -801,6 +801,81 @@ h1 {
     font-size: 10px;
     color: #9b854f;
 }
+.step-help,
+.workbook-references {
+    border: 1px solid #e6dfd4;
+    border-radius: 6px;
+    background: #fbf8f1;
+    padding: 16px;
+    margin-top: 14px;
+    font-size: 12px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+.step-help > strong {
+    display: block;
+    color: #8c3d43;
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+.step-help > p {
+    margin: 3px 0 12px;
+}
+.workbook-references article {
+    border-top: 1px solid #e6dfd4;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+.workbook-references article > span {
+    display: block;
+    color: #66707c;
+    font-size: 11px;
+}
+.lab-requirements {
+    padding-left: 18px;
+    margin: 12px 0 20px;
+    color: #657182;
+    font-size: 11px;
+    line-height: 1.8;
+}
+.environment-content {
+    padding: 32px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #b8c7d5;
+}
+.environment-content > svg {
+    width: 48px;
+    height: 48px;
+    color: #7ed4bb;
+    margin-bottom: 20px;
+}
+.environment-content h3 {
+    color: #f6f3ed;
+    font-size: 22px;
+    margin-bottom: 12px;
+}
+.environment-content p,
+.environment-content ul {
+    margin-bottom: 20px;
+}
+.environment-content ul {
+    padding-left: 20px;
+}
+.trainer-shell.dark-theme .step-help,
+.trainer-shell.dark-theme .workbook-references {
+    background: #19212e;
+    border-color: #344155;
+    color: #cbd5e1;
+}
+.trainer-shell.dark-theme .step-help > strong {
+    color: #f2a0a4;
+}
+.trainer-shell.dark-theme .workbook-references article > span,
+.trainer-shell.dark-theme .lab-requirements {
+    color: #a9bacb;
+}
 .lesson-footer {
     border-top: 1px solid #ece8e0;
     display: flex;
@@ -2195,5 +2270,43 @@ h1 {
     background: #090e17;
     color: #f1f5f9;
 }
-
-
+.trainer-shell.dark-theme .lesson-pane,
+.trainer-shell.dark-theme .objectives-panel {
+    background: #131c2e;
+    border-color: #334155;
+}
+.trainer-shell.dark-theme .pane-label {
+    background: #0f172a;
+    border-color: #334155;
+}
+.trainer-shell.dark-theme .split-workspace {
+    border-color: #334155;
+}
+.trainer-shell.dark-theme .objective,
+.trainer-shell.dark-theme .installation-checkpoint,
+.trainer-shell.dark-theme .vm-notice,
+.trainer-shell.dark-theme .command-hint {
+    background: #192638;
+    border-color: #3a4a60;
+    color: #cbd5e1;
+}
+.trainer-shell.dark-theme .lesson-toolbar select,
+.trainer-shell.dark-theme .breadcrumb strong,
+.trainer-shell.dark-theme .progress-number,
+.trainer-shell.dark-theme .objective strong,
+.trainer-shell.dark-theme .command-hint pre {
+    color: #e2e8f0;
+}
+.trainer-shell.dark-theme .lesson-explanation,
+.trainer-shell.dark-theme .step-content > p,
+.trainer-shell.dark-theme .objective p,
+.trainer-shell.dark-theme .verification p {
+    color: #aebcd0;
+}
+.trainer-shell.dark-theme .hint-toggle,
+.trainer-shell.dark-theme .step-help .text-button {
+    color: #f1a0a6;
+}
+.trainer-shell.dark-theme .progress-track {
+    background: #334155;
+}

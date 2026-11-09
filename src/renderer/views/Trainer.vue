@@ -5,27 +5,16 @@ import "xterm/css/xterm.css";
 import TrainerIcon from "../components/TrainerIcon.vue";
 import InstallationLab from "../components/InstallationLab.vue";
 import RapidQuiz from "../components/RapidQuiz.vue";
-import { paths, lessons } from "../data/curriculum";
+import { categories, lessons, workbooks } from "../data/curriculum";
+import { normalizeProgress } from "../data/progress";
 import type { LabStatus, Runtime, CheckResult } from "../../shared/trainer.js";
 
 const api = window.trainer;
-const pathIcons: Record<string, string> = {
-    rhcsa: "terminal",
-    rhce: "search",
-    cloud: "cloud",
-    services: "layers",
-    identity: "key",
-    deployment: "package",
-    security: "shield",
-    availability: "cluster",
-    performance: "chart",
-    rhca: "compass",
-};
 const section = ref("learn");
 const isDark = ref(false);
 const search = ref("");
-const selectedPath = ref(paths[0].id);
-const selectedLesson = ref(paths[0].lessonIds[0]);
+const selectedCategory = ref(categories[0].id);
+const selectedLesson = ref(categories[0].lessonIds[0]);
 const stepIndex = ref(0);
 const hintVisible = ref(false);
 const overviewVisible = ref(false);
@@ -53,43 +42,74 @@ let statusTimer: ReturnType<typeof setInterval> | undefined;
 let polling = false;
 let term: Terminal | null = null;
 let rawBuffer = "";
-const path = computed(() => paths.find(item => item.id === selectedPath.value)!);
-const pathLessons = computed(() => path.value.lessonIds.map(id => lessons.find(item => item.id === id)!));
+const category = computed(() => categories.find(item => item.id === selectedCategory.value)!);
+const categoryLessons = computed(() => category.value.lessonIds.map(id => lessons.find(item => item.id === id)!));
 const lesson = computed(() => lessons.find(item => item.id === selectedLesson.value)!);
 const step = computed(() => lesson.value.steps[stepIndex.value]);
-const filteredPaths = computed(() =>
-    paths.filter(item =>
+const filteredCategories = computed(() =>
+    categories.filter(item =>
         `${item.code} ${item.title} ${item.topics.join(" ")}`.toLowerCase().includes(search.value.toLowerCase()),
     ),
 );
 const percent = computed(() =>
     Math.round(
-        (pathLessons.value.filter(item => completed.value.includes(item.id)).length / pathLessons.value.length) * 100,
+        (categoryLessons.value.filter(item => completed.value.includes(item.id)).length /
+            categoryLessons.value.length) *
+            100,
     ),
 );
 const totalComplete = computed(() => lessons.filter(item => completed.value.includes(item.id)).length);
 const isRunning = computed(() => status.value.state === "running");
 const isLastStep = computed(() => stepIndex.value === lesson.value.steps.length - 1);
 const isInstallation = computed(() => lesson.value.id === "rhel-installation");
-const installationComplete = computed(() =>
-    lessons
-        .find(item => item.id === "rhel-installation")!
-        .steps.every(item => item.id && installationCheckpoints.value.includes(item.id)),
-);
-const currentInstallationStepDone = computed(() =>
-    Boolean(step.value.id && installationCheckpoints.value.includes(step.value.id)),
-);
-
-function installationStepLocked(index: number) {
+const needsCheckpoint = computed(() => lesson.value.environment !== "container");
+const practiceCheckpoints = ref<Record<string, string[]>>({});
+const currentCheckpoints = computed({
+    get: () =>
+        isInstallation.value ? installationCheckpoints.value : practiceCheckpoints.value[lesson.value.id] || [],
+    set: (value: string[]) => {
+        if (isInstallation.value) installationCheckpoints.value = value;
+        else practiceCheckpoints.value = { ...practiceCheckpoints.value, [lesson.value.id]: value };
+    },
+});
+function checkpointsComplete(id: string) {
+    const item = lessons.find(item => item.id === id)!;
+    const saved = id === "rhel-installation" ? installationCheckpoints.value : practiceCheckpoints.value[id] || [];
+    return item.steps.every(step => saved.includes(step.id));
+}
+const practiceComplete = computed(() => checkpointsComplete(lesson.value.id));
+const currentStepDone = computed(() => currentCheckpoints.value.includes(step.value.id));
+const sourceVisible = ref(false);
+const sourceError = ref("");
+const commandVisible = ref(false);
+const helpPanel = ref<HTMLDivElement | null>(null);
+const lessonScroll = ref<HTMLDivElement | null>(null);
+function toggleHelp() {
+    hintVisible.value = !hintVisible.value;
+    if (hintVisible.value) void nextTick(() => helpPanel.value?.scrollIntoView({ block: "nearest" }));
+}
+function practiceStepLocked(index: number) {
     return (
-        isInstallation.value &&
-        lesson.value.steps.slice(0, index).some(item => !item.id || !installationCheckpoints.value.includes(item.id))
+        needsCheckpoint.value &&
+        lesson.value.steps.slice(0, index).some(item => !currentCheckpoints.value.includes(item.id))
     );
 }
+async function openWorkbook(id: string) {
+    sourceError.value = "";
+    try {
+        await api?.openWorkbook(id);
+    } catch (error) {
+        sourceError.value = error instanceof Error ? error.message : String(error);
+    }
+}
+function selectInstallation() {
+    selectCategory("basics");
+    selectedLesson.value = "rhel-installation";
+}
 
-function selectPath(id: string) {
-    selectedPath.value = id;
-    selectedLesson.value = path.value.lessonIds[0];
+function selectCategory(id: string) {
+    selectedCategory.value = id;
+    selectedLesson.value = category.value.lessonIds[0];
     section.value = "learn";
     overviewVisible.value = false;
 }
@@ -97,9 +117,14 @@ watch(selectedLesson, () => {
     stepIndex.value = 0;
     hintVisible.value = false;
     feedback.value = null;
+    sourceVisible.value = false;
+    sourceError.value = "";
+    commandVisible.value = false;
+    void nextTick(() => lessonScroll.value?.scrollTo({ top: 0 }));
 });
 watch(stepIndex, () => {
     hintVisible.value = false;
+    commandVisible.value = false;
 });
 watch(isDark, dark => {
     if (term) {
@@ -128,11 +153,27 @@ watch(
 watch(
     installationCheckpoints,
     value => {
-        if (!installationComplete.value) completed.value = completed.value.filter(id => id !== "rhel-installation");
+        if (!checkpointsComplete("rhel-installation"))
+            completed.value = completed.value.filter(id => id !== "rhel-installation");
         try {
             localStorage.setItem("rhelboat.installation.checkpoints.v1", JSON.stringify(value));
         } catch {
             /* Checkpoints remain available for this session. */
+        }
+    },
+    { deep: true },
+);
+
+watch(
+    practiceCheckpoints,
+    value => {
+        completed.value = completed.value.filter(
+            id => lessons.find(item => item.id === id)?.checkId || checkpointsComplete(id),
+        );
+        try {
+            localStorage.setItem("rhelboat.practice.checkpoints.v1", JSON.stringify(value));
+        } catch {
+            /* Session progress still works. */
         }
     },
     { deep: true },
@@ -170,6 +211,11 @@ function setupTerminal() {
         term.write(rawBuffer);
     }
 }
+watch(terminalMount, mount => {
+    term?.dispose();
+    term = null;
+    if (mount && isRunning.value) setupTerminal();
+});
 
 function clearTerminal() {
     output.value = "";
@@ -193,18 +239,14 @@ function appendOutput(chunk: string) {
 }
 onMounted(async () => {
     try {
-        const saved: unknown = JSON.parse(localStorage.getItem("rhelboat.progress.v1") || "[]");
-        if (Array.isArray(saved))
-            completed.value = saved.filter(
-                (id): id is string => typeof id === "string" && lessons.some(item => item.id === id),
-            );
-        const checkpoints: unknown = JSON.parse(localStorage.getItem("rhelboat.installation.checkpoints.v1") || "[]");
-        if (Array.isArray(checkpoints))
-            installationCheckpoints.value = checkpoints.filter(
-                (id): id is string =>
-                    typeof id === "string" &&
-                    lessons.find(item => item.id === "rhel-installation")!.steps.some(item => item.id === id),
-            );
+        const saved = normalizeProgress({
+            completed: JSON.parse(localStorage.getItem("rhelboat.progress.v1") || "[]"),
+            installationCheckpoints: JSON.parse(localStorage.getItem("rhelboat.installation.checkpoints.v1") || "[]"),
+            practiceCheckpoints: JSON.parse(localStorage.getItem("rhelboat.practice.checkpoints.v1") || "{}"),
+        });
+        completed.value = saved.completed;
+        installationCheckpoints.value = saved.installationCheckpoints;
+        practiceCheckpoints.value = saved.practiceCheckpoints;
         const savedRuntime = localStorage.getItem("rhelboat.runtime");
         if (savedRuntime === "podman" || savedRuntime === "docker") runtime.value = savedRuntime;
         const savedTheme = localStorage.getItem("rhelboat.theme");
@@ -335,7 +377,7 @@ function useCommand() {
     void nextTick(() => commandInput.value?.focus());
 }
 function markComplete(id = lesson.value.id) {
-    if (id === "rhel-installation" && !installationComplete.value) return;
+    if (!lessons.find(item => item.id === id)?.checkId && !checkpointsComplete(id)) return;
     if (!completed.value.includes(id)) completed.value.push(id);
 }
 async function checkLab() {
@@ -355,21 +397,12 @@ async function checkLab() {
     }
 }
 function nextLesson() {
-    const index = pathLessons.value.findIndex(item => item.id === selectedLesson.value);
-    if (index < pathLessons.value.length - 1) selectedLesson.value = pathLessons.value[index + 1].id;
+    const index = categoryLessons.value.findIndex(item => item.id === selectedLesson.value);
+    if (index < categoryLessons.value.length - 1) selectedLesson.value = categoryLessons.value[index + 1].id;
 }
 function openSource(url: string) {
     if (api) void api.openSource(url).catch(showError);
     else window.open(url, "_blank", "noopener,noreferrer");
-}
-function handleCopyCommand(text: string) {
-    if (navigator.clipboard) {
-        void navigator.clipboard.writeText(text);
-    }
-    if (isRunning.value) {
-        command.value = text;
-        void nextTick(() => commandInput.value?.focus());
-    }
 }
 
 function toggleTheme() {
@@ -390,6 +423,7 @@ function exportProgress() {
         exportedAt: new Date().toISOString(),
         completed: completed.value,
         installationCheckpoints: installationCheckpoints.value,
+        practiceCheckpoints: practiceCheckpoints.value,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -412,20 +446,13 @@ function handleImport(event: Event) {
     const reader = new FileReader();
     reader.onload = e => {
         try {
-            const parsed = JSON.parse(String(e.target?.result || "{}"));
-            if (Array.isArray(parsed.completed)) {
-                completed.value = parsed.completed.filter(
-                    (id: unknown): id is string => typeof id === "string" && lessons.some(l => l.id === id),
-                );
-            }
-            if (Array.isArray(parsed.installationCheckpoints)) {
-                installationCheckpoints.value = parsed.installationCheckpoints.filter(
-                    (id: unknown): id is string => typeof id === "string",
-                );
-            }
+            const saved = normalizeProgress(JSON.parse(String(e.target?.result || "{}")));
+            completed.value = saved.completed;
+            installationCheckpoints.value = saved.installationCheckpoints;
+            practiceCheckpoints.value = saved.practiceCheckpoints;
             progressFeedback.value = "Progress imported successfully.";
         } catch {
-            progressFeedback.value = "Failed to import progress file: Invalid JSON format.";
+            progressFeedback.value = "Choose a valid RHELboat progress JSON backup.";
         }
     };
     reader.readAsText(file);
@@ -436,6 +463,7 @@ function resetAllProgress() {
     if (confirm("Are you sure you want to reset all completed lessons and checkpoints? This cannot be undone.")) {
         completed.value = [];
         installationCheckpoints.value = [];
+        practiceCheckpoints.value = {};
         progressFeedback.value = "All progress has been reset.";
     }
 }
@@ -451,7 +479,7 @@ function resetAllProgress() {
             <div class="sidebar-section-label">YOUR WORKSPACE</div>
             <nav class="main-nav" aria-label="Workspace">
                 <button :class="{ active: section === 'learn' }" @click="section = 'learn'">
-                    <TrainerIcon name="book" />Learning paths<span class="nav-count">{{ paths.length }}</span>
+                    <TrainerIcon name="book" />Training library<span class="nav-count">{{ categories.length }}</span>
                 </button>
                 <button :class="{ active: section === 'quiz' }" @click="section = 'quiz'">
                     <TrainerIcon name="shield" />Rapid Quiz<span class="nav-count">Sim</span>
@@ -467,27 +495,27 @@ function resetAllProgress() {
                 </button>
             </nav>
             <div class="path-heading">
-                <span class="sidebar-section-label">CERTIFICATION PATHS</span><span>{{ paths.length }}</span>
+                <span class="sidebar-section-label">TRAINING CATEGORIES</span><span>{{ categories.length }}</span>
             </div>
             <label class="path-search"
                 ><TrainerIcon name="search" /><input
                     v-model="search"
-                    placeholder="Find a path or topic…"
-                    aria-label="Find a certification path"
+                    placeholder="Find a category or topic…"
+                    aria-label="Find a training category"
             /></label>
-            <nav class="path-nav" aria-label="Certification paths">
+            <nav class="path-nav" aria-label="Training categories">
                 <button
-                    v-for="item in filteredPaths"
+                    v-for="item in filteredCategories"
                     :key="item.id"
-                    :class="{ selected: selectedPath === item.id && section === 'learn' }"
-                    @click="selectPath(item.id)"
+                    :class="{ selected: selectedCategory === item.id && section === 'learn' }"
+                    @click="selectCategory(item.id)"
                 >
-                    <span class="path-icon"><TrainerIcon :name="pathIcons[item.id] || 'book'" /></span>
+                    <span class="path-icon"><TrainerIcon :name="item.icon" /></span>
                     <span class="path-code">{{ item.code }}</span
                     ><span class="path-name">{{ item.title }}</span
                     ><TrainerIcon name="chevron" />
                 </button>
-                <p v-if="!filteredPaths.length" class="empty-search">No matching paths.</p>
+                <p v-if="!filteredCategories.length" class="empty-search">No matching categories.</p>
             </nav>
             <div class="sidebar-bottom">
                 <span class="avatar"><TrainerIcon name="terminal" /></span>
@@ -503,9 +531,9 @@ function resetAllProgress() {
                 <div class="breadcrumb">
                     <span>RHELboat</span><TrainerIcon name="chevron" /><strong>{{
                         section === "learn"
-                            ? "Learning paths"
+                            ? "Training library"
                             : section === "quiz"
-                              ? "Rapid Simulation Quiz"
+                              ? "Rapid topic quiz"
                               : section === "progress"
                                 ? "My progress"
                                 : "Lab setup"
@@ -537,46 +565,45 @@ function resetAllProgress() {
             <template v-if="section === 'learn'">
                 <section class="course-header">
                     <div>
-                        <div class="eyebrow"><span class="track-marker"></span>ENTERPRISE LINUX / {{ path.code }}</div>
-                        <h1>{{ path.title }}</h1>
-                        <p>{{ path.subtitle }}</p>
+                        <div class="eyebrow">
+                            <span class="track-marker"></span>ENTERPRISE LINUX / CATEGORY {{ category.code }}
+                        </div>
+                        <h1>{{ category.title }}</h1>
+                        <p>{{ category.subtitle }}</p>
                         <div class="course-meta">
-                            <span class="exam-badge">{{ path.code }}</span
-                            ><span>{{ path.level }}</span
-                            ><span class="meta-divider"></span><span>{{ pathLessons.length }} guided lessons</span
-                            ><span v-if="path.version" class="version-label">{{ path.version }}</span>
+                            <span class="exam-badge">Category {{ category.code }}</span
+                            ><span>Workbook practice</span><span class="meta-divider"></span
+                            ><span>{{ categoryLessons.length }} guided lessons</span
+                            ><span class="version-label">RHEL 9 / 10 source material</span>
                         </div>
                     </div>
                     <div class="course-progress">
                         <div class="progress-number">{{ percent }}<span>%</span></div>
-                        <span>path progress</span>
+                        <span>category progress</span>
                         <div class="progress-track"><div :style="{ width: percent + '%' }"></div></div>
                         <button class="text-button" @click="overviewVisible = !overviewVisible">
-                            {{ overviewVisible ? "Hide" : "View" }} objectives <TrainerIcon name="chevron" />
+                            {{ overviewVisible ? "Hide" : "View" }} topics <TrainerIcon name="chevron" />
                         </button>
                     </div>
                 </section>
                 <section v-if="overviewVisible" class="objectives-panel">
                     <div>
-                        <h2>Your path to {{ path.code }}</h2>
-                        <p>{{ path.description }}</p>
+                        <h2>Topics in {{ category.title }}</h2>
+                        <p>{{ category.description }}</p>
                         <p class="coverage-note">
-                            These original practice lessons introduce the topics below. They do not cover every exam
-                            objective.
+                            Original practice scenarios follow the workbook subjects. Read the linked source pages for
+                            additional context and use the marked environment for each task.
                         </p>
-                        <button class="text-button" @click="openSource(path.examUrl)">
-                            Official objectives <TrainerIcon name="external" />
-                        </button>
                     </div>
                     <ul>
-                        <li v-for="topic in path.topics" :key="topic">{{ topic }}</li>
+                        <li v-for="topic in category.topics" :key="topic">{{ topic }}</li>
                     </ul>
                 </section>
                 <div class="lesson-toolbar">
                     <div>
                         <TrainerIcon name="book" /><label for="lesson-select">Your lesson</label
                         ><select id="lesson-select" v-model="selectedLesson">
-                            <option v-for="(item, index) in pathLessons" :key="item.id" :value="item.id">
+                            <option v-for="(item, index) in categoryLessons" :key="item.id" :value="item.id">
                                 {{ String(index + 1).padStart(2, "0") }} · {{ item.title
                                 }}{{ completed.includes(item.id) ? " ✓" : "" }}
                             </option>
@@ -589,8 +616,8 @@ function resetAllProgress() {
                                 : lesson.environment === "container"
                                   ? "Hands-on lab"
                                   : lesson.environment === "vm"
-                                    ? "VM guide"
-                                    : "Multi-node guide"
+                                    ? "VM lab"
+                                    : "Multiple-VM lab"
                         }}</span></span
                     >
                 </div>
@@ -602,7 +629,7 @@ function resetAllProgress() {
                                 >{{ stepIndex + 1 }} / {{ lesson.steps.length }} steps</span
                             >
                         </div>
-                        <div class="lesson-scroll">
+                        <div ref="lessonScroll" class="lesson-scroll">
                             <span class="topic-label">{{ lesson.topic }}</span>
                             <h2>{{ lesson.title }}</h2>
                             <p class="lesson-explanation">{{ lesson.explanation }}</p>
@@ -624,15 +651,18 @@ function resetAllProgress() {
                             <div v-else-if="lesson.environment !== 'container'" class="vm-notice">
                                 <TrainerIcon name="info" />
                                 <p>
-                                    This guide requires
+                                    This lab requires
                                     {{
                                         lesson.environment === "vm"
                                             ? "a disposable RHEL virtual machine"
                                             : "multiple RHEL machines or a product-specific environment"
-                                    }}. Commands in this guide are for that environment. The container shell cannot
+                                    }}. Tasks and command examples are for that environment. The container shell cannot
                                     validate these tasks.
                                 </p>
                             </div>
+                            <ul v-if="lesson.environment !== 'container'" class="lab-requirements">
+                                <li v-for="requirement in lesson.requirements" :key="requirement">{{ requirement }}</li>
+                            </ul>
                             <nav class="step-navigation" aria-label="Lesson steps">
                                 <button
                                     v-for="(item, index) in lesson.steps"
@@ -640,7 +670,7 @@ function resetAllProgress() {
                                     :class="{ current: stepIndex === index, past: stepIndex > index }"
                                     :aria-label="`Step ${index + 1}: ${item.title}`"
                                     :aria-current="stepIndex === index ? 'step' : undefined"
-                                    :disabled="installationStepLocked(index)"
+                                    :disabled="practiceStepLocked(index)"
                                     @click="stepIndex = index"
                                 >
                                     <TrainerIcon v-if="stepIndex > index" name="check" /><span v-else>{{
@@ -652,31 +682,45 @@ function resetAllProgress() {
                                 <span class="eyebrow">STEP {{ String(stepIndex + 1).padStart(2, "0") }}</span>
                                 <h3>{{ step.title }}</h3>
                                 <p>{{ step.instruction }}</p>
-                                <template v-if="step.command"
-                                    ><button
-                                        class="hint-toggle"
-                                        :aria-expanded="hintVisible"
-                                        @click="hintVisible = !hintVisible"
+                                <button class="hint-toggle" :aria-expanded="hintVisible" @click="toggleHelp">
+                                    <TrainerIcon name="info" />{{
+                                        hintVisible ? "Hide step help" : "Help with this step"
+                                    }}
+                                </button>
+                                <div
+                                    v-if="hintVisible"
+                                    ref="helpPanel"
+                                    class="step-help"
+                                    role="region"
+                                    aria-label="Help for this step"
+                                >
+                                    <strong>Feature to use</strong>
+                                    <p>{{ step.help.feature }}</p>
+                                    <strong>Why it helps</strong>
+                                    <p>{{ step.help.why }}</p>
+                                    <button
+                                        v-if="step.command"
+                                        class="text-button"
+                                        @click="commandVisible = !commandVisible"
                                     >
-                                        <TrainerIcon name="terminal" />{{
-                                            hintVisible ? "Hide command hint" : "Need a hint? Show command"
-                                        }}
+                                        {{ commandVisible ? "Hide command example" : "Show command example" }}
                                     </button>
-                                    <div v-if="hintVisible" class="command-hint">
+                                    <div v-if="commandVisible && step.command" class="command-hint">
                                         <pre>{{ step.command }}</pre>
                                         <button
                                             v-if="lesson.environment === 'container'"
                                             class="text-button"
                                             @click="useCommand"
                                         >
-                                            <TrainerIcon name="copy" />Use in shell</button
-                                        ><span v-else>Run in your disposable VM environment.</span>
-                                    </div></template
-                                >
+                                            <TrainerIcon name="copy" />Use in shell
+                                        </button>
+                                        <span v-else>Run in the disposable RHEL guest console.</span>
+                                    </div>
+                                </div>
                             </article>
-                            <label v-if="isInstallation" class="installation-checkpoint"
-                                ><input v-model="installationCheckpoints" type="checkbox" :value="step.id" />I completed
-                                this step in my installation lab (self-reported).</label
+                            <label v-if="needsCheckpoint" class="installation-checkpoint"
+                                ><input v-model="currentCheckpoints" type="checkbox" :value="step.id" />I completed this
+                                step in the required lab environment (self-reported).</label
                             >
                             <div v-if="isLastStep" class="verification">
                                 <h4>
@@ -693,15 +737,11 @@ function resetAllProgress() {
                                 ><button
                                     v-else
                                     class="button secondary"
-                                    :disabled="isInstallation && !installationComplete"
+                                    :disabled="needsCheckpoint && !practiceComplete"
                                     @click="markComplete()"
                                 >
                                     <TrainerIcon name="check" />{{
-                                        completed.includes(lesson.id)
-                                            ? "Reviewed"
-                                            : isInstallation
-                                              ? "Record installation practice"
-                                              : "Mark guide reviewed"
+                                        completed.includes(lesson.id) ? "Practice recorded" : "Record lab practice"
                                     }}
                                 </button>
                                 <div
@@ -719,16 +759,42 @@ function resetAllProgress() {
                                         ? "Installation practice completed · self-reported"
                                         : lesson.checkId
                                           ? "Lab successfully checked"
-                                          : "Guide reviewed · self-reported"
+                                          : "Lab practice completed · self-reported"
                                 }}
                             </div>
-                            <button class="source-link" @click="openSource(lesson.sourceUrl)">
-                                {{
-                                    isInstallation
-                                        ? "Official RHEL installation guide"
-                                        : "Based on official exam objectives"
-                                }}<TrainerIcon name="external" />
+                            <button
+                                class="source-link"
+                                :aria-expanded="sourceVisible"
+                                @click="sourceVisible = !sourceVisible"
+                            >
+                                Workbook references <TrainerIcon name="book" />
                             </button>
+                            <div v-if="sourceVisible" class="workbook-references">
+                                <p>
+                                    These lesson summaries and scenarios are original adaptations. Page numbers below
+                                    are PDF page numbers.
+                                </p>
+                                <article
+                                    v-for="reference in lesson.references"
+                                    :key="reference.workbookId + reference.section"
+                                >
+                                    <strong>{{ workbooks[reference.workbookId].title }}</strong>
+                                    <span
+                                        >{{ workbooks[reference.workbookId].release }} · PDF pages
+                                        {{ reference.pages[0] }}–{{ reference.pages[1] }}</span
+                                    >
+                                    <p>{{ reference.section }}</p>
+                                    <button
+                                        class="text-button"
+                                        :disabled="!api"
+                                        @click="openWorkbook(reference.workbookId)"
+                                    >
+                                        Open local PDF
+                                    </button>
+                                </article>
+                                <p v-if="!api">Open the desktop app to read a local PDF from training/.</p>
+                                <p v-if="sourceError" role="alert">{{ sourceError }}</p>
+                            </div>
                         </div>
                         <footer class="lesson-footer">
                             <button class="button subtle" :disabled="stepIndex === 0" @click="stepIndex--">
@@ -737,7 +803,7 @@ function resetAllProgress() {
                             ><button
                                 v-if="!isLastStep"
                                 class="button dark"
-                                :disabled="isInstallation && !currentInstallationStepDone"
+                                :disabled="needsCheckpoint && !currentStepDone"
                                 @click="stepIndex++"
                             >
                                 Next step<TrainerIcon name="arrow" /></button
@@ -745,8 +811,8 @@ function resetAllProgress() {
                                 v-else
                                 class="button dark"
                                 :disabled="
-                                    selectedLesson === pathLessons[pathLessons.length - 1].id ||
-                                    (isInstallation && !completed.includes(lesson.id))
+                                    selectedLesson === categoryLessons[categoryLessons.length - 1].id ||
+                                    (needsCheckpoint && !completed.includes(lesson.id))
                                 "
                                 @click="nextLesson"
                             >
@@ -755,7 +821,33 @@ function resetAllProgress() {
                         </footer>
                     </section>
 
-                    <InstallationLab v-if="isInstallation" />
+                    <InstallationLab
+                        v-if="lesson.environment === 'vm'"
+                        :installing="isInstallation"
+                        @open-installation="selectInstallation"
+                    />
+                    <section
+                        v-else-if="lesson.environment === 'multi-node'"
+                        class="terminal-pane environment-pane"
+                        aria-label="Required lab environment"
+                    >
+                        <div class="terminal-header"><strong>Multiple-VM practice</strong></div>
+                        <div class="environment-content">
+                            <TrainerIcon name="cluster" />
+                            <h3>Prepare your lab machines.</h3>
+                            <p>This topic needs the systems listed below. Perform its tasks in their guest consoles.</p>
+                            <ul>
+                                <li v-for="requirement in lesson.requirements" :key="requirement">{{ requirement }}</li>
+                            </ul>
+                            <p>
+                                Checkpoints record your own observations. These guests are not automatically provisioned
+                                or graded.
+                            </p>
+                            <button class="button secondary" @click="selectInstallation">
+                                Open installation practice
+                            </button>
+                        </div>
+                    </section>
                     <section v-else class="terminal-pane" aria-label="Interactive Linux container shell">
                         <div class="terminal-header">
                             <div><TrainerIcon name="terminal" /><strong>Lab shell</strong><span>UBI 10</span></div>
@@ -861,17 +953,15 @@ function resetAllProgress() {
 
             <RapidQuiz
                 v-else-if="section === 'quiz'"
-                :current-path-id="selectedPath"
+                :current-category-id="selectedCategory"
                 :current-lesson-id="selectedLesson"
                 :completed-lesson-ids="completed"
-                @select-lesson="id => selectedLesson = id"
-                @copy-command="handleCopyCommand"
             />
 
             <section v-else-if="section === 'progress'" class="utility-page">
                 <div class="eyebrow">EVERY STEP COUNTS</div>
                 <h1>Your learning, at a glance.</h1>
-                <p>Checked labs and reviewed guides are saved on this computer.</p>
+                <p>Checked container labs and recorded VM practice are saved on this computer.</p>
                 <div class="progress-summary">
                     <strong
                         >{{ totalComplete }}<span> / {{ lessons.length }}</span></strong
@@ -881,7 +971,10 @@ function resetAllProgress() {
                 <div class="progress-management-bar">
                     <div class="manage-text">
                         <strong>Manage Training Data</strong>
-                        <p>Export your achievements and checkpoints as a JSON backup, or import to restore on a new machine.</p>
+                        <p>
+                            Export your achievements and checkpoints as a JSON backup, or import to restore on a new
+                            machine.
+                        </p>
                         <span v-if="progressFeedback" class="progress-feedback-msg">{{ progressFeedback }}</span>
                     </div>
                     <div class="manage-actions">
@@ -900,7 +993,11 @@ function resetAllProgress() {
                         />
                         <button
                             class="button danger"
-                            :disabled="!totalComplete && !installationCheckpoints.length"
+                            :disabled="
+                                !totalComplete &&
+                                !installationCheckpoints.length &&
+                                !Object.values(practiceCheckpoints).some(value => value.length)
+                            "
                             @click="resetAllProgress"
                         >
                             <TrainerIcon name="reset" />Reset
@@ -909,8 +1006,8 @@ function resetAllProgress() {
                 </div>
 
                 <div class="progress-grid">
-                    <article v-for="item in paths" :key="item.id">
-                        <span class="exam-badge">{{ item.code }}</span>
+                    <article v-for="item in categories" :key="item.id">
+                        <span class="exam-badge">Category {{ item.code }}</span>
                         <h2>{{ item.title }}</h2>
                         <p>
                             {{ item.lessonIds.filter(id => completed.includes(id)).length }} of
@@ -923,7 +1020,7 @@ function resetAllProgress() {
                                 }"
                             ></div>
                         </div>
-                        <button class="text-button" @click="selectPath(item.id)">
+                        <button class="text-button" @click="selectCategory(item.id)">
                             Continue learning<TrainerIcon name="arrow" />
                         </button>
                     </article>
@@ -974,7 +1071,7 @@ function resetAllProgress() {
                         <h2>Know your environment</h2>
                         <p>
                             UBI provides Enterprise Linux userspace. It does not replace a full RHEL VM for boot,
-                            systemd, SELinux, storage, clustering, or product-specific exercises. VM guides are marked,
+                            systemd, SELinux, storage, clustering, or product-specific exercises. VM labs are marked,
                             and their completion is self-reported.
                         </p>
                         <button
@@ -986,9 +1083,8 @@ function resetAllProgress() {
                     </article>
                 </div>
                 <p class="coverage-note">
-                    The shell is a line console with command history and Ctrl+C. Full-screen editors and interactive
-                    terminal applications require an external terminal. Independent introductory material; use the
-                    official objectives to plan complete exam preparation.
+                    Use the shell for container lessons and the guest console for VM lessons. Source pages, tool
+                    explanations and command examples are available beside each guided step.
                 </p>
             </section>
         </main>

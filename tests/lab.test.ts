@@ -55,11 +55,18 @@ else process.exit(2);
         assert.throws(() => lab.write("x".repeat(16_385)), /16384/);
         assert.deepEqual(supportedCheckIds.sort(), [
             "archive",
+            "documentation",
+            "edit-files",
+            "environment",
+            "find-files",
             "links",
             "navigation",
+            "password-policy",
             "permissions",
             "processes",
             "scripting",
+            "shared-directory",
+            "shell-loops",
             "text",
             "users",
         ]);
@@ -257,7 +264,7 @@ if (args[0] === 'build') {
 });
 
 test(
-    "live Podman shell and all eight lesson objectives",
+    "live Podman shell and all checked workbook lesson objectives",
     { skip: process.env.RHELBOAT_LIVE_TEST !== "1", timeout: 180_000 },
     async () => {
         const execute = promisify(execFile);
@@ -290,11 +297,8 @@ test(
             let sequence = 0;
             for (const lesson of lessons.filter(lesson => lesson.checkId)) {
                 for (const step of lesson.steps) if (step.command) await command(step.command, ++sequence);
-                assert.equal(
-                    (await lab.check(lesson.checkId!)).passed,
-                    true,
-                    `${lesson.id} must pass after its documented steps`,
-                );
+                const result = await lab.check(lesson.checkId!);
+                assert.equal(result.passed, true, `${lesson.id}: ${result.message}\n${output.slice(-2000)}`);
             }
             await command("cd /tmp", ++sequence);
             await command("pwd", ++sequence);

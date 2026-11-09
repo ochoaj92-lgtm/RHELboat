@@ -10,14 +10,32 @@ const LABEL_KEY = "io.rhelboat.lab";
 const LABEL_VALUE = "v1";
 
 const checks: Record<string, string> = {
-    navigation: "if [ ! -f /root/lab/notes.txt ]; then echo 'Missing /root/lab/notes.txt file.'; exit 1; fi; grep -Fqx 'enterprise linux' /root/lab/notes.txt || { echo '/root/lab/notes.txt does not contain exact line \"enterprise linux\".'; exit 1; }",
-    permissions: 'if [ ! -f /root/lab/private.txt ]; then echo \'Missing /root/lab/private.txt file.\'; exit 1; fi; mode=$(stat -c %a /root/lab/private.txt); if [ "$mode" != "600" ]; then echo "File permissions are $mode, expected 600."; exit 1; fi',
+    documentation:
+        "test -s /root/lab/chmod-help.txt && grep -q -- --reference /root/lab/chmod-help.txt || { echo 'Save chmod help including its --reference option in chmod-help.txt.'; exit 1; }",
+    environment:
+        "test -f /root/lab/environment.txt && test \"$(cat /root/lab/environment.txt)\" = 'training shell' || { echo 'environment.txt must contain the exported child-shell value training shell.'; exit 1; }",
+    "find-files":
+        "test -f /root/lab/found-configs.txt && test \"$(cat /root/lab/found-configs.txt)\" = \"$(printf '%s\\n' /root/lab/search-lab/app.conf /root/lab/search-lab/nested/db.conf)\" || { echo 'Save exactly the two sorted configuration paths in found-configs.txt.'; exit 1; }",
+    "edit-files":
+        "test -f /root/lab/editor.conf && test \"$(cat /root/lab/editor.conf)\" = \"$(printf 'MODE=training\\nOWNER=trainee')\" || { echo 'editor.conf must have MODE=training followed by OWNER=trainee.'; exit 1; }",
+    "shared-directory":
+        "test -d /root/lab/team && test \"$(stat -c %a /root/lab/team)\" = 2770 && test -f /root/lab/team/team.txt && test \"$(stat -c '%a %G' /root/lab/team/team.txt)\" = '660 operators' || { echo 'Set team to mode 2770, then create team.txt with mode 660 and group operators.'; exit 1; }",
+    "password-policy":
+        "getent shadow trainee | awk -F: '$5 == 90 && $6 == 7 { found=1 } END { exit !found }' || { echo 'Set trainee password maximum age to 90 and warning interval to 7 with chage.'; exit 1; }",
+    "shell-loops":
+        "test -x /root/lab/names.sh && test \"$(/root/lab/names.sh)\" = \"$(printf 'alpha\\nbeta')\" || { echo 'names.sh must be executable and print alpha and beta on separate lines.'; exit 1; }",
+    navigation:
+        "if [ ! -f /root/lab/notes.txt ]; then echo 'Missing /root/lab/notes.txt file.'; exit 1; fi; grep -Fqx 'enterprise linux' /root/lab/notes.txt || { echo '/root/lab/notes.txt does not contain exact line \"enterprise linux\".'; exit 1; }",
+    permissions:
+        'if [ ! -f /root/lab/private.txt ]; then echo \'Missing /root/lab/private.txt file.\'; exit 1; fi; mode=$(stat -c %a /root/lab/private.txt); if [ "$mode" != "600" ]; then echo "File permissions are $mode, expected 600."; exit 1; fi',
     users: "if ! getent group operators >/dev/null; then echo \"Group 'operators' does not exist.\"; exit 1; fi; id -nG trainee 2>/dev/null | tr ' ' '\\n' | grep -qx operators || { echo \"User 'trainee' is not in group 'operators'.\"; exit 1; }",
     processes: "pgrep -x sleep | grep -qv '^1$' || { echo 'No background sleep process found.'; exit 1; }",
-    archive: "if [ ! -f /root/lab/backup.tar.gz ]; then echo 'Missing /root/lab/backup.tar.gz file.'; exit 1; fi; tar -tzf /root/lab/backup.tar.gz 2>/dev/null | grep -Eq '^(\\./)?notes\\.txt$' || { echo 'Archive does not contain notes.txt.'; exit 1; }",
+    archive:
+        "if [ ! -f /root/lab/backup.tar.gz ]; then echo 'Missing /root/lab/backup.tar.gz file.'; exit 1; fi; tar -tzf /root/lab/backup.tar.gz 2>/dev/null | grep -Eq '^(\\./)?notes\\.txt$' || { echo 'Archive does not contain notes.txt.'; exit 1; }",
     links: "if [ ! -L /root/lab/latest ]; then echo '/root/lab/latest is not a symbolic link.'; exit 1; fi; target=$(readlink -f /root/lab/latest 2>/dev/null); if [ \"$target\" != \"/root/lab/notes.txt\" ]; then echo \"Link points to '$target', expected '/root/lab/notes.txt'.\"; exit 1; fi; test -f /root/lab/latest || { echo 'Link target does not exist.'; exit 1; }",
-    text: "if [ ! -f /root/lab/errors.log ]; then echo 'Missing /root/lab/errors.log file.'; exit 1; fi; count=$(grep -c ERROR /root/lab/errors.log 2>/dev/null || echo 0); if [ \"$count\" != \"2\" ]; then echo \"Found $count lines matching ERROR, expected 2.\"; exit 1; fi",
-    scripting: "if [ ! -f /root/lab/hello.sh ]; then echo 'Missing /root/lab/hello.sh script.'; exit 1; fi; if [ ! -x /root/lab/hello.sh ]; then echo '/root/lab/hello.sh is not executable (chmod +x).'; exit 1; fi; out=$(/root/lab/hello.sh 2>&1); if [ \"$out\" != \"hello enterprise linux\" ]; then echo \"Script output was '$out', expected 'hello enterprise linux'.\"; exit 1; fi",
+    text: 'if [ ! -f /root/lab/errors.log ]; then echo \'Missing /root/lab/errors.log file.\'; exit 1; fi; count=$(grep -c ERROR /root/lab/errors.log 2>/dev/null || true); if [ "$count" != "2" ]; then echo "Found $count lines matching ERROR, expected 2."; exit 1; fi',
+    scripting:
+        "if [ ! -f /root/lab/hello.sh ]; then echo 'Missing /root/lab/hello.sh script.'; exit 1; fi; if [ ! -x /root/lab/hello.sh ]; then echo '/root/lab/hello.sh is not executable (chmod +x).'; exit 1; fi; out=$(/root/lab/hello.sh 2>&1); if [ \"$out\" != \"hello enterprise linux\" ]; then echo \"Script output was '$out', expected 'hello enterprise linux'.\"; exit 1; fi",
 };
 
 export const supportedCheckIds = Object.keys(checks);

@@ -12,6 +12,7 @@ export interface CheckResult {
 }
 
 export interface TrainerAPI {
+    openWorkbook(id: string): Promise<void>;
     installation: import("./installation.js").InstallationAPI;
     status(runtime: Runtime): Promise<LabStatus>;
     start(runtime: Runtime): Promise<LabStatus>;

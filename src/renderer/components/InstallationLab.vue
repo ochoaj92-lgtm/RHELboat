@@ -3,6 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import TrainerIcon from "./TrainerIcon.vue";
 import type { ISOInfo, VMCapabilities, VMStatus } from "../../shared/installation.js";
 
+withDefaults(defineProps<{ installing?: boolean }>(), { installing: true });
+defineEmits<{ (event: "open-installation"): void }>();
+
 const api = window.trainer;
 const vm = api?.installation;
 const capabilities = ref<VMCapabilities>({ available: false, kvm: false, message: "Checking QEMU…" });
@@ -126,9 +129,12 @@ async function shutdown() {
 </script>
 
 <template>
-    <section class="terminal-pane installation-pane" aria-label="RHEL installation virtual machine">
+    <section class="terminal-pane installation-pane" aria-label="RHEL practice virtual machine">
         <div class="terminal-header">
-            <div><TrainerIcon name="package" /><strong>Installation VM</strong><span>QEMU</span></div>
+            <div>
+                <TrainerIcon name="package" /><strong>{{ installing ? "Installation VM" : "Practice VM" }}</strong
+                ><span>QEMU</span>
+            </div>
             <span class="terminal-state"
                 ><span class="status-dot" :class="{ online: running }"></span
                 >{{ running ? "Running" : "Stopped" }}</span
@@ -136,8 +142,10 @@ async function shutdown() {
         </div>
         <div class="installation-scroll">
             <div class="installation-intro">
-                <span class="terminal-eyebrow">INSTALL THE REAL OPERATING SYSTEM</span>
-                <h3>Your first RHEL machine.</h3>
+                <span class="terminal-eyebrow">{{
+                    installing ? "INSTALL THE REAL OPERATING SYSTEM" : "WORK IN YOUR RHEL GUEST"
+                }}</span>
+                <h3>{{ installing ? "Your first RHEL machine." : "Boot your practice system." }}</h3>
                 <p>Follow the lesson here and work in the real QEMU console window beside RHELboat.</p>
             </div>
             <div v-if="!vm" class="installation-notice">
@@ -146,7 +154,7 @@ async function shutdown() {
             <div v-else-if="!capabilities.available" class="installation-notice">
                 {{ capabilities.message }} Install QEMU with its GTK display module on your Linux host.
             </div>
-            <section class="installation-card">
+            <section v-if="installing" class="installation-card">
                 <h4><span>01</span> Get your installation media</h4>
                 <p>
                     Download the DVD ISO for your target release and x86_64 architecture. Sign in and review Red Hat’s
@@ -185,6 +193,11 @@ async function shutdown() {
                     >
                 </div>
             </section>
+            <div v-if="!installing && !status.diskExists" class="installation-notice">
+                Install a RHEL guest first, or use your own disposable VM. Extra disks and other machines must be
+                prepared with your virtualization tools.
+                <button class="button secondary" @click="$emit('open-installation')">Open installation practice</button>
+            </div>
             <section class="installation-card">
                 <h4><span>02</span> Configure your training VM</h4>
                 <fieldset :disabled="busy || running">
@@ -221,14 +234,20 @@ async function shutdown() {
                 </p>
             </section>
             <section class="installation-card">
-                <h4><span>03</span> Practice in the installer</h4>
-                <p>
-                    Start with the ISO. After installation, open the installer shell with Ctrl+Alt+F2 and run
-                    <code>poweroff</code>. Wait for the VM to stop, then boot the installed disk; choosing Reboot System
-                    first would start the still-attached ISO again.
+                <h4>
+                    <span>03</span> {{ installing ? "Practice in the installer" : "Continue in the guest console" }}
+                </h4>
+                <p v-if="installing">
+                    After installation, use Ctrl+Alt+F1, then Ctrl+B followed by 2 to reach the installer shell and run
+                    <code>poweroff</code>. Wait for the VM to stop, then boot the installed disk without the ISO.
+                </p>
+                <p v-else>
+                    Boot the installed disk and perform the lesson in its QEMU console. Check the lesson prerequisites
+                    before changing storage, network or security settings.
                 </p>
                 <div class="vm-actions">
                     <button
+                        v-if="installing"
                         class="button terminal-start"
                         :disabled="!canStart || !checksumMatches"
                         @click="start('iso')"

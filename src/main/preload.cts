@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { TrainerAPI } from "../shared/trainer.js";
 
 const trainer: TrainerAPI & { openSource: (url: string) => Promise<void> } = {
+    openWorkbook: id => ipcRenderer.invoke("trainer:open-workbook", id),
     installation: {
         capabilities: () => ipcRenderer.invoke("installation:capabilities"),
         selectISO: () => ipcRenderer.invoke("installation:select-iso"),

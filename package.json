@@ -52,13 +52,11 @@
         "rhel",
         "enterprise-linux",
         "linux-training",
-        "rhcsa",
-        "rhce",
-        "rhca",
         "podman",
         "docker",
-        "certification",
-        "electron"
+        "electron",
+        "linux-administration",
+        "workbooks"
     ],
     "desktopName": "rhelboat.desktop"
 }

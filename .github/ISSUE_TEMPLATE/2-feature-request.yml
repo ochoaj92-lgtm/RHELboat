@@ -20,7 +20,7 @@ body:
       id: proposal
       attributes:
           label: Proposed improvement
-          description: Describe the smallest useful change. For lessons, include the topic, certification path, and official objective link when available.
+          description: Describe the smallest useful change. For lessons, include the category, topic, source workbook section, and PDF page range when available.
       validations:
           required: true
     - type: textarea

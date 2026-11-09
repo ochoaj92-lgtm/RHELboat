@@ -8,7 +8,7 @@
 
 RHELboat guides you through installing a real RHEL system from an official ISO, then puts Linux lessons beside an isolated container shell. Follow the next step, practice it, and inspect the result.
 
-[Get started](#run-rhelboat) · [Learning paths](#learning-paths) · [Contribute](CONTRIBUTING.md) · [Brand assets](docs/BRANDING.md)
+[Get started](#run-rhelboat) · [Training categories](#training-categories) · [Contribute](CONTRIBUTING.md) · [Brand assets](docs/BRANDING.md)
 
 ![RHELboat workspace showing step-by-step instructions beside the Linux lab shell](docs/assets/workspace.png)
 
@@ -16,12 +16,14 @@ RHELboat guides you through installing a real RHEL system from an official ISO, 
 
 ## Learn beside the shell
 
-| Guided learning                                   | Hands-on practice                                          | Your own workspace                                                          |
-| ------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 18 original lessons across 10 certification paths | Eight container labs with checks against the actual result | Local progress, persistent lab files, and reset when you need a fresh start |
-| Rapid simulation quizzes on active & completed topics | Real Bash through Podman or Docker                         | RHEL installation VM plus marked full-system guides                         |
+| Guided learning                                       | Hands-on practice                                       | Your own workspace                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 40 original lessons across 10 subject categories      | 15 container labs with checks against the actual result | Local progress, persistent lab files, and reset when you need a fresh start |
+| Topic quizzes and help explaining each tool’s purpose | Real Bash through Podman or Docker                      | RHEL installation VM plus marked full-system guides                         |
 
-The checked labs cover shell navigation, permissions, users and groups, processes, archives, symbolic links, text processing, and scripting. Ten additional guides cover the RHEL installation workflow and introduce full-system and specialist topics, with official references linked from each lesson.
+Lessons follow the subjects in your local System Administration I and II workbooks, the RHEL 10 study guide, and diagnostic practice notes. The language-models book is excluded. Guided explanations and scenarios are original adaptations with PDF page references; the app does not embed complete books or reproduce their question sets.
+
+Each step includes **Help with this step**: the relevant feature, why it is useful, and an optional command example. Examples for full-system tasks are shown for the guest console. Only container examples can be inserted into the container shell.
 
 ## Run RHELboat
 
@@ -48,10 +50,10 @@ This packages RHELboat against your system's Electron, installs desktop integrat
 
 Bun 1.3+ can install the existing lockfile with `bun install --frozen-lockfile`; the app scripts use Node.js.
 
-1. Choose a certification path and lesson.
-2. For the first RHCSA lesson, use the VM panel to get an ISO, verify it, configure the VM, and start installation. Its QEMU console opens in a separate window beside the guide.
+1. Choose a training category and topic.
+2. For the installation lesson, use the VM panel to get an ISO, verify it, configure the VM, and start installation. Its QEMU console opens in a separate window beside the guide.
 3. For container exercises, select your runtime in **Lab setup**, or use **Start lab environment** beside the lesson. **Use in shell** inserts a command hint; press Enter to run it.
-4. Use **Check my work** to verify a container lab. Installation checkpoints and other VM or multi-node guides use self-reported completion.
+4. Use **Check my work** to verify a container lab. Installation checkpoints and other VM or multiple-VM labs require saved step confirmations and use self-reported completion.
 
 To browse lessons without launching the desktop app:
 
@@ -63,7 +65,7 @@ The browser preview shows the curriculum. Container execution, ISO selection and
 
 ## Install RHEL hands-on
 
-The first RHCSA lesson, **Install RHEL from the official ISO**, follows the real installation workflow with saved checkpoints:
+The Getting started lesson, **Install RHEL from the official ISO**, follows the real installation workflow with saved checkpoints:
 
 1. Open [Red Hat's download page](https://developers.redhat.com/products/rhel/download), sign in yourself, and choose the release and architecture for your preparation. The current VM launcher uses x86_64. Prefer the DVD ISO for a self-contained installation; Boot ISO needs an additional source.
 2. Select the downloaded ISO in the app, paste the matching 64-character SHA-256 value from Red Hat, and verify it. No release checksum or expiring download URL is hardcoded. A match confirms the selected bytes against the value you supplied; you must obtain that value from the official source.
@@ -73,30 +75,34 @@ The first RHCSA lesson, **Install RHEL from the official ISO**, follows the real
 
 Follow the [official RHEL 10 interactive installation documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/interactively_installing_rhel_from_installation_media/index) for your selected release. RHELboat does not sign in, accept Red Hat membership or license terms, download an entitled ISO automatically, or register the guest on your behalf. Passwords are entered directly in your browser or the VM console.
 
-Installation is foundational preparation for boot, storage, networking and account administration. ISO installation itself is not explicitly listed in the [current EX200 objectives](https://www.redhat.com/en/services/training/ex200-red-hat-certified-system-administrator-rhcsa-exam). The app verifies the ISO and manages the VM, but **does not grade installer choices or the guest configuration**. Checkpoints record the learner's own confirmation.
+Installation is the foundation for boot, storage, networking and account practice. The app verifies the ISO and manages the VM but does not automatically grade installer choices or guest configuration. Step confirmations record the learner’s own observations.
 
 The VM's persistent disk is stored in `installation-vm/` inside Electron's application user-data directory. It is separate from container files and progress; container reset does not erase it. The launcher attaches no host raw disks or shared host folders. The VM uses its own user-mode network, while the container labs retain their separate network isolation.
 
 **Closing RHELboat leaves this separate VM running.** Shut down from the guest or request graceful shutdown in the VM panel, then wait for it to stop. The app provides no forced power-off or VM-disk deletion control. Do not close the QEMU window while the installer or guest is writing to disk.
 
-## Learning paths
+## Training categories
 
-| Path                          | Focus                                                      |
-| ----------------------------- | ---------------------------------------------------------- |
-| EX200 · RHCSA                 | Essential tools and system administration                  |
-| EX342 · Enterprise Linux RHCE | Diagnostics and troubleshooting                            |
-| EX210                         | Cloud infrastructure                                       |
-| EX358                         | Services management and automation                         |
-| EX362                         | Identity management                                        |
-| EX403                         | Deployment and systems management                          |
-| EX415                         | Linux security                                             |
-| EX436                         | High availability clustering                               |
-| EX442                         | Performance tuning                                         |
-| RHCA roadmap                  | Core credentials and three eligible specialist credentials |
+| Category                     | Topics                                                          |
+| ---------------------------- | --------------------------------------------------------------- |
+| Getting started              | Installation, navigation, documentation, shell environment      |
+| Files & text                 | Links, archives, filtering, searching, editing                  |
+| Users & permissions          | Accounts, access bits, group collaboration, password aging      |
+| Shell & processes            | Jobs, executable scripts, loops, scheduling                     |
+| Software management          | RPM, DNF, repositories, Flatpak                                 |
+| Services & startup           | systemd, journal, time, recovery, Kickstart                     |
+| Storage & filesystems        | Mounts, LVM, swap, NFS, encrypted volumes                       |
+| Networking & remote access   | Profiles, DNS, SSH, secure file transfer                        |
+| System security              | SELinux, firewalld                                              |
+| Operations & troubleshooting | Containers, performance, faults, authentication, tracing, iSCSI |
 
-**Coverage:** RHELboat is an introductory trainer, not a complete course for every exam. Boot, systemd, SELinux, block storage, clustering, and licensed product exercises need disposable RHEL VMs or the relevant multi-node infrastructure. The app can launch its dedicated installation VM; other full-system and multi-node environments must be prepared separately. Guest configuration is not automatically graded. Its shell is a line console with command history and Ctrl+C; full-screen terminal applications need an external terminal.
+**15 container labs** verify actual state. **25 VM or multiple-VM labs** list their prerequisites, require step confirmations, and record self-reported practice. The installation VM can be booted from other single-VM topics. Extra disks, snapshots, additional guests and product infrastructure must be prepared using your virtualization tools; the app does not provision or grade those environments.
 
-Curriculum references were reviewed November 8, 2026 against Red Hat's [certification catalog](https://www.redhat.com/en/services/certifications), [certification FAQ](https://www.redhat.com/en/services/training-and-certification/faq), and the individual exam objectives linked in the app. The Enterprise Linux RHCE path uses EX200 + EX342; EX294 belongs to the separate Ansible path. EX260 is excluded because its official exam page is [retired](https://www.redhat.com/en/services/training/retired-ex260-red-hat-certified-specialist-in-ceph-cloud-storage-exam). Check official objectives and available versions before planning an exam.
+Use **Workbook references** to see the source title, release, section and PDF page range. **Open local PDF** opens a registered file from `training/` in the desktop PDF reader. In a packaged app, place personal copies in a `training/` folder beside the application resources (or inside the application directory for system Electron installs). Missing PDFs do not prevent the adapted lessons from working. The raw PDFs are kept local and excluded from Git and distributable packages.
+
+The sources cover both RHEL 9 and 10. Follow the source version shown beside a lesson, inspect your installed command’s documentation, and account for release differences. Legacy diagnostic notes supply investigation topics; their old commands and answer text are not treated as current procedures. See [the full topic-to-source map](docs/TRAINING.md).
+
+Existing checked lesson progress and installation checkpoints are retained. Retired certification-only guides are removed; new VM lab completion requires its own saved step confirmations. Progress export/import includes these confirmations.
 
 ## How the lab works
 
@@ -123,7 +129,7 @@ npm run build:linux
 
 RPM packaging also requires your distribution's `rpmbuild` tool (`rpm` on Debian/Ubuntu, `rpm-build` on RHEL/Fedora). To build the other formats without it, run `npm run build` followed by `npx electron-builder --linux AppImage deb tar.bz2`.
 
-Default tests check curriculum integrity, execute file exercises in temporary directories, and verify container isolation, ownership protection, input validation, and lifecycle behavior using a fixture runtime. To exercise the actual Podman shell and all eight checked lessons:
+Default tests check curriculum integrity, execute file exercises in temporary directories, and verify container isolation, ownership protection, input validation, and lifecycle behavior using a fixture runtime. To exercise the actual Podman shell and all 15 checked lessons:
 
 ```sh
 RHELBOAT_LIVE_TEST=1 node --test tests/lab.test.ts
@@ -133,12 +139,12 @@ The live test refuses to run if `rhelboat-lab` already exists. It removes only i
 
 ## Contributing
 
-Improvements to explanations, accessibility, lab checks, and certification topic coverage are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Report application issues in the [RHELboat issue tracker](https://github.com/ochoaj92-lgtm/RHELboat/issues); see [SECURITY.md](SECURITY.md) for security reports.
+Improvements to explanations, accessibility, lab checks, and workbook topic coverage are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Report application issues in the [RHELboat issue tracker](https://github.com/ochoaj92-lgtm/RHELboat/issues); see [SECURITY.md](SECURITY.md) for security reports.
 
 Brand sources, icon exports, and artwork conventions are documented in [docs/BRANDING.md](docs/BRANDING.md). Repository About text and social-preview settings are listed in [.github/PROJECT.md](.github/PROJECT.md).
 
 ## Credits and license
 
-RHELboat is an independent project adapted from [WinBoat](https://github.com/TibixDev/winboat) by TibixDev. The original copyright notice and MIT terms are preserved in [LICENSE](LICENSE). Legacy Windows integration sources remain for reference and are not part of the trainer's startup flow.
+RHELboat is an independent project adapted from [WinBoat](https://github.com/TibixDev/winboat) by TibixDev. The original copyright notice and MIT terms are preserved in [LICENSE](LICENSE). The trainer runs through its own Electron entry point.
 
-Practice content is original; official courseware and exam questions are not reproduced. Red Hat and RHEL are trademarks of Red Hat, Inc. RHELboat is not affiliated with or endorsed by Red Hat.
+Practice explanations, quizzes and scenarios are original adaptations of the subjects in the locally supplied books. Complete source PDFs are not bundled. Red Hat and RHEL are trademarks of Red Hat, Inc. RHELboat is not affiliated with or endorsed by Red Hat.

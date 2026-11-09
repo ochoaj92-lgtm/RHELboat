@@ -1,151 +1,142 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readlinkSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { lessons, paths } from "../src/renderer/data/curriculum.ts";
+import { lessons, categories, workbooks } from "../src/renderer/data/curriculum.ts";
 import { supportedCheckIds } from "../src/main/lab.ts";
 
-const runnableIds = ["navigation", "permissions", "users", "processes", "archive", "links", "text", "scripting"];
-const environments = new Set(["container", "vm", "multi-node"]);
+const checkedIds = [
+    "navigation",
+    "documentation",
+    "environment",
+    "links",
+    "archive",
+    "text",
+    "find-files",
+    "edit-files",
+    "users",
+    "permissions",
+    "shared-directory",
+    "password-policy",
+    "processes",
+    "scripting",
+    "shell-loops",
+];
 
-function officialUrl(value: string) {
-    const url = new URL(value);
-    assert.equal(url.protocol, "https:");
-    assert.ok(url.hostname === "redhat.com" || url.hostname.endsWith(".redhat.com"));
-}
-
-test("all paths reference complete, unique, source-linked lessons", () => {
-    const lessonIds = new Set(lessons.map(lesson => lesson.id));
-    assert.equal(lessonIds.size, lessons.length);
-    assert.equal(new Set(paths.map(path => path.id)).size, paths.length);
-    assert.equal(new Set(paths.map(path => path.code)).size, paths.length);
-    const referenced = new Set<string>();
-
-    for (const path of paths) {
-        officialUrl(path.examUrl);
-        assert.ok(environments.has(path.environment));
-        assert.ok(path.title && path.description && path.subtitle);
-        assert.ok(path.topics.length > 0);
-        assert.ok(path.lessonIds.length > 0);
-        assert.equal(new Set(path.lessonIds).size, path.lessonIds.length);
-        for (const id of path.lessonIds) {
-            assert.ok(lessonIds.has(id), `${path.code} references missing lesson ${id}`);
-            referenced.add(id);
-        }
+test("topic catalog has reachable lessons, valid workbook references and contextual help", () => {
+    assert.equal(categories.length, 10);
+    assert.equal(lessons.length, 40);
+    assert.equal(new Set(categories.map(item => item.id)).size, categories.length);
+    assert.equal(new Set(lessons.map(item => item.id)).size, lessons.length);
+    assert.deepEqual(new Set(lessons.map(item => item.categoryId)), new Set(categories.map(item => item.id)));
+    const referencedBooks = new Set<string>();
+    for (const category of categories) {
+        assert.ok(category.title && category.description && category.topics.length);
+        assert.ok(category.lessonIds.length);
+        assert.doesNotMatch(`${category.title} ${category.subtitle}`, /EX\d{3}|RHCSA|RHCE|RHCA/);
+        assert.deepEqual(
+            category.lessonIds,
+            lessons.filter(item => item.categoryId === category.id).map(item => item.id),
+        );
     }
-
     for (const lesson of lessons) {
-        assert.ok(referenced.has(lesson.id), `Unreachable lesson ${lesson.id}`);
-        officialUrl(lesson.sourceUrl);
-        assert.ok(environments.has(lesson.environment));
         assert.ok(lesson.title && lesson.topic && lesson.objective && lesson.explanation && lesson.success);
-        assert.ok(lesson.duration > 0);
+        assert.ok(lesson.requirements.length && lesson.duration > 0);
         assert.ok(lesson.steps.length >= 3);
+        assert.equal(new Set(lesson.steps.map(item => item.id)).size, lesson.steps.length);
         for (const step of lesson.steps) {
-            assert.ok(step.title && step.instruction);
+            assert.ok(step.id && step.title && step.instruction);
+            assert.ok(
+                step.help.feature.length >= 2 && step.help.why.length > 20,
+                `${lesson.id}: help must explain the feature and its purpose`,
+            );
+        }
+        assert.ok(lesson.references.length);
+        for (const reference of lesson.references) {
+            const source = workbooks[reference.workbookId];
+            assert.ok(source && reference.section);
+            assert.ok(Number.isInteger(reference.pages[0]) && Number.isInteger(reference.pages[1]));
+            assert.ok(
+                reference.pages[0] >= 1 &&
+                    reference.pages[1] >= reference.pages[0] &&
+                    reference.pages[1] <= source.pageCount,
+            );
+            referencedBooks.add(reference.workbookId);
         }
         if (lesson.checkId) {
             assert.equal(lesson.environment, "container");
             assert.equal(lesson.id, lesson.checkId);
         } else {
-            assert.notEqual(lesson.environment, "container", "Container exercises must have real checks");
+            assert.notEqual(lesson.environment, "container");
             assert.match(lesson.success, /^Self-review:/);
         }
     }
+    assert.deepEqual([...referencedBooks].sort(), Object.keys(workbooks).sort());
     assert.deepEqual(
         lessons
-            .filter(lesson => lesson.checkId)
-            .map(lesson => lesson.checkId)
+            .filter(item => item.checkId)
+            .map(item => item.checkId)
             .sort(),
-        runnableIds.toSorted(),
+        checkedIds.toSorted(),
     );
-    assert.deepEqual(supportedCheckIds.toSorted(), runnableIds.toSorted());
+    assert.deepEqual(supportedCheckIds.toSorted(), checkedIds.toSorted());
 });
 
-test("Enterprise Linux catalog includes active exams and the current architect progression", () => {
-    assert.deepEqual(
-        paths.map(path => path.code).sort(),
-        ["EX200", "EX210", "EX342", "EX358", "EX362", "EX403", "EX415", "EX436", "EX442", "RHCA"].sort(),
-    );
-    assert.ok(paths.find(path => path.code === "EX342")?.subtitle.includes("RHCE Enterprise Linux"));
-    assert.ok(paths.find(path => path.code === "RHCA")?.description.includes("three eligible specialist"));
-    const foundation = paths.find(path => path.code === "EX200");
-    for (const id of runnableIds) assert.ok(foundation?.lessonIds.includes(id));
-});
-
-test("RHCSA starts with a source-linked installation guide and stable self-reported checkpoints", () => {
-    const foundation = paths.find(path => path.code === "EX200")!;
-    assert.equal(foundation.lessonIds[0], "rhel-installation");
-    const installation = lessons[0];
-    assert.equal(installation.id, "rhel-installation");
-    assert.equal(installation.environment, "vm");
+test("installation retains stable checkpoints while its references come from workbooks", () => {
+    const installation = lessons.find(item => item.id === "rhel-installation")!;
+    assert.equal(categories[0].lessonIds[0], installation.id);
+    assert.equal(installation.steps.length, 13);
+    assert.equal(installation.steps[0].id, "download-iso");
+    assert.equal(installation.steps.at(-1)?.id, "prove-persistence");
     assert.equal(installation.checkId, undefined);
-    assert.match(installation.success, /^Self-review:/);
-    assert.match(installation.explanation, /not explicitly listed in the current EX200 objectives/);
-    officialUrl(installation.sourceUrl);
-    assert.match(installation.sourceUrl, /interactively_installing_rhel_from_installation_media/);
-    assert.ok(installation.steps.length >= 12);
-    const ids = installation.steps.map(step => step.id);
-    assert.equal(new Set(ids).size, ids.length);
-    for (const id of ids) assert.match(id || "", /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
-    assert.deepEqual(ids, [
-        "download-iso",
-        "verify-iso",
-        "configure-vm",
-        "boot-install-media",
-        "language-keyboard",
-        "destination-storage",
-        "software-source",
-        "network-time",
-        "administrator-account",
-        "review-install",
-        "boot-installed-system",
-        "verify-installed-system",
-        "prove-persistence",
-    ]);
+    assert.ok(installation.references.some(reference => reference.workbookId === "rhel10"));
 });
 
-test("every suggested command is valid Bash syntax", () => {
-    for (const lesson of lessons) {
+test("suggested commands parse as Bash and file labs produce the promised results", () => {
+    for (const lesson of lessons)
         for (const step of lesson.steps) {
             if (!step.command) continue;
             const result = spawnSync("/bin/bash", ["-n", "-c", step.command], { encoding: "utf8" });
             assert.equal(result.status, 0, `${lesson.id}: ${result.stderr}`);
         }
-    }
-});
-
-test("file exercise commands produce their promised results in a temporary workspace", () => {
     const directory = mkdtempSync(join(tmpdir(), "rhelboat-curriculum-"));
     try {
-        for (const id of ["navigation", "permissions", "archive", "links", "text", "scripting"]) {
-            const lesson = lessons.find(item => item.id === id)!;
-            for (const step of lesson.steps) {
+        const fileLabs = [
+            "navigation",
+            "documentation",
+            "environment",
+            "links",
+            "archive",
+            "text",
+            "find-files",
+            "edit-files",
+            "permissions",
+            "scripting",
+            "shell-loops",
+        ];
+        for (const id of fileLabs)
+            for (const step of lessons.find(item => item.id === id)!.steps) {
                 if (!step.command) continue;
                 const result = spawnSync("/bin/bash", ["-c", step.command.replaceAll("/root/lab", directory)], {
                     encoding: "utf8",
                 });
+                // diff exits 1 when the intended edit is present; the following cat still succeeds.
                 assert.equal(result.status, 0, `${id}: ${result.stderr}`);
             }
-        }
-        assert.equal(readFileSync(join(directory, "notes.txt"), "utf8"), "enterprise linux\n");
-        assert.equal(statSync(join(directory, "private.txt")).mode & 0o777, 0o600);
-        const archive = spawnSync("tar", ["-tzf", join(directory, "backup.tar.gz")], { encoding: "utf8" });
-        assert.equal(archive.status, 0, archive.stderr);
-        assert.ok(archive.stdout.split("\n").includes("notes.txt"));
-        assert.equal(readlinkSync(join(directory, "latest")), join(directory, "notes.txt"));
+        assert.equal(readFileSync(join(directory, "environment.txt"), "utf8"), "training shell\n");
+        assert.equal(readFileSync(join(directory, "editor.conf"), "utf8"), "MODE=training\nOWNER=trainee\n");
         assert.equal(
-            readFileSync(join(directory, "errors.log"), "utf8")
-                .split("\n")
-                .filter(line => line.includes("ERROR")).length,
-            2,
+            readFileSync(join(directory, "found-configs.txt"), "utf8"),
+            `${directory}/search-lab/app.conf\n${directory}/search-lab/nested/db.conf\n`,
         );
-        assert.ok(statSync(join(directory, "hello.sh")).mode & 0o100);
-        const script = spawnSync(join(directory, "hello.sh"), [], { encoding: "utf8" });
-        assert.equal(script.status, 0, script.stderr);
-        assert.equal(script.stdout, "hello enterprise linux\n");
+        assert.equal(statSync(join(directory, "private.txt")).mode & 0o777, 0o600);
+        assert.equal(spawnSync(join(directory, "names.sh"), [], { encoding: "utf8" }).stdout, "alpha\nbeta\n");
+        assert.equal(
+            spawnSync(join(directory, "hello.sh"), [], { encoding: "utf8" }).stdout,
+            "hello enterprise linux\n",
+        );
     } finally {
         rmSync(directory, { recursive: true, force: true });
     }

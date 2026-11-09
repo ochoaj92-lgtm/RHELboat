@@ -4,6 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ContainerLab } from "./lab.js";
 import { InstallationVM } from "./installation-vm.js";
+import { workbookPath } from "./workbooks.js";
 import type { VMOptions } from "../shared/installation.js";
 
 app.setName("RHELboat");
@@ -39,7 +40,9 @@ function createWindow() {
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("will-navigate", event => event.preventDefault());
     window.webContents.on("did-finish-load", () => console.log("[main] Window finished loading"));
-    window.webContents.on("did-fail-load", (_event, code, desc) => console.error("[main] Window failed to load:", code, desc));
+    window.webContents.on("did-fail-load", (_event, code, desc) =>
+        console.error("[main] Window failed to load:", code, desc),
+    );
     window.on("close", event => {
         console.log("[main] Window close requested, closing =", closing);
         if (!closing) {
@@ -79,6 +82,13 @@ if (!app.requestSingleInstanceLock()) {
         });
         const installation = new InstallationVM(join(app.getPath("userData"), "installation-vm"));
         const handlers = {
+            "trainer:open-workbook": async (id: unknown) => {
+                const directory = existsSync(join(process.resourcesPath, "training"))
+                    ? join(process.resourcesPath, "training")
+                    : join(appDir, "training");
+                const error = await shell.openPath(await workbookPath(directory, id));
+                if (error) throw new Error(error);
+            },
             "installation:capabilities": () => installation.capabilities(),
             "installation:status": () => installation.status(),
             "installation:select-iso": async () => {
