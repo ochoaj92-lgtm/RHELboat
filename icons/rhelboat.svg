@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">RHELboat</title>
+  <desc id="desc">An ivory and red sailboat with a terminal prompt on a charcoal background.</desc>
+  <rect width="256" height="256" rx="56" fill="#101820"/>
+  <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#2b3a43" stroke-width="4"/>
+  <path d="M120 57v91H54Z" fill="#f6f3ed"/>
+  <path d="M140 76v72h57Z" fill="#e53635"/>
+  <path d="M129 49v106" fill="none" stroke="#f6f3ed" stroke-width="7" stroke-linecap="round"/>
+  <path d="M47 163h162l-24 34H72Z" fill="#e53635"/>
+  <path d="m98 173 9 7-9 7m22 0h18" fill="none" stroke="#f6f3ed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M76 212h35m29 0h35" fill="none" stroke="#7ed4bb" stroke-width="6" stroke-linecap="round"/>
+</svg>

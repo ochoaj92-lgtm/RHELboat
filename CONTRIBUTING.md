@@ -1,43 +1,46 @@
-# WinBoat Contribution Guidelines
+# Contributing to RHELboat
 
-This document outlines the general contribution guidelines that apply to WinBoat.
+RHELboat is an independent Enterprise Linux training app. Contributions should help learners understand a topic, practice safely, or verify their work.
 
-> [!TIP]
-> If you're new to open source, the [Open Source Etiquette](https://developer.mozilla.org/en-US/docs/MDN/Community/Open_source_etiquette) is an excellent read that you should check out before reading the rest of this document.
+## Make a focused change
 
-> [!IMPORTANT]
-> Basic familiarity with Git and GitHub is required: If you are also new to these tools, visit [GitHub for complete beginners](https://github.com/git-guides#learning-git-basics) for a comprehensive introduction to them.
+Fork this repository, create a descriptive branch, and keep each pull request centered on one problem. For a substantial new feature or learning path, describe the learner's goal in an issue before implementation. Check existing issues first.
 
-## General
+The active app uses TypeScript, Vue, and Electron. Reuse existing components and helpers, and avoid new dependencies when the platform or installed packages already solve the problem. Keep legacy integration sources separate from the trainer startup.
 
-1. **Avoid vibe-coding large features** - While probably most of us use AI while coding in our day to day lives, you should try to use it in a clever and targeted manner. Avoid submitting large vibe-coded features, because in 99% of the cases they will not behave as expected. These kinds of PR-s drain our energy and time that could be focused on something more useful, because what took a few seconds for the AI assistant to pump out will take us hours to test, discuss, and ultimately scrap because it doesn't take into account half the things a real programmer probably would. If you made heavy use of AI in your pull request, **indicate it**.
+## Add or improve lessons
 
-2. **Do not break existing code** - WinBoat aims to provide a seamless user experience, so please avoid the breakage of any existing features to the best of your abilities. Ensure that folks potentially upgrading to a new version that includes your changes won't have any problems, and address any migrations if they're required.
+Curriculum lives in `src/renderer/data/curriculum.ts`; container checks live in `src/main/lab.ts`.
 
-3. **Do rigorous testing** - WinBoat is used by tens of thousands of folks every day on a wide range of Linux distros, make sure that the PR you submit doesn't break compatibility on any of the mainstream distros.
+- Write original explanations and practice tasks, and link the relevant official objectives.
+- State the required environment accurately: container, disposable VM, or multi-node infrastructure.
+- Check the resulting system state for container labs. Guide review must remain distinct from verified lab completion.
+- Keep instructions repeatable and disclose commands that replace exercise files or alter a practice system.
+- The RHEL installation lesson uses stable step IDs for saved checkpoints. Preserve IDs when editing wording; do not rename or reuse them for different tasks without a progress migration. Installer checkpoints are self-reported, not automatic guest validation.
+- Do not submit exam questions, exam dumps, or copied commercial courseware.
 
-4. **If you're unsure, ask** - If you want to start working on something large that you then intend for us to merge into WinBoat, it may be worth asking us first in an issue to understand if the feature is compatible with the philosophy of WinBoat and whether we want to include it. The same idea applies if you're unsure how to implement a feature in a way that's compatible with how WinBoat operates.
+Preserve the lab's host isolation, runtime ownership checks, accessibility, and local data. Never introduce a host-directory mount, privileged container, or destructive host command to make an exercise work. The installation VM must use only its app-owned virtual disk; keep ISO and resource validation at the main-process boundary. Do not automate Red Hat sign-in or acceptance of license terms, store guest credentials, or treat a requested graceful shutdown as proof that the guest has stopped.
 
-5. **Avoid introducing new programming languages** - WinBoat uses TypeScript & Vue for the Electron app, and Go & PowerShell for the Guest Server. Use these for getting things done.
+## Check your work
 
-6. **Avoid introducing new foreign dependencies** - Chances are there's an NPM / Go package for what you're trying to achieve or at least something similar. If there isn't, and it's a must to include it, discuss with us first.
+Use Node.js 24+ and Podman or Docker as described in [README.md](README.md).
 
-## Branch Management
+```sh
+npm run typecheck
+npm test
+npm run build
+```
 
-Before contributing, you should always create a personal fork of WinBoat, where you can create a dedicated branch for the changes you're aiming to make. Once you're finished with your changes, you can go ahead and create a PR aiming to merge your changes to WinBoat's main branch. If you're still in the process of development, but you'd still like to open a PR for visibility or discussion, make sure that you open a draft PR instead.
+Use the opt-in Podman test for changes to container behavior:
 
-**Branch naming convention:** Use descriptive names like `feat/your-feature-name` or `fix/issue-description`
+```sh
+RHELBOAT_LIVE_TEST=1 node --test tests/lab.test.ts
+```
 
-## Pull Requests & Commits
+It requires that no `rhelboat-lab` container already exists. For installation changes, distinguish fixture tests from an actual ISO installation, and report any unavailable QEMU, KVM or entitled ISO coverage. Preserve the VM disk and confirm a clean guest shutdown; closing the app does not stop its separate QEMU process. For visual changes, include a screenshot and check the smaller desktop layout, keyboard navigation, focus indicators, and reduced-motion behavior. Follow [docs/BRANDING.md](docs/BRANDING.md) when changing icons or artwork.
 
-Your PR title should include what it's trying to do, e.g. `feat: Add VNC port into Configuration`, while the description should outline it in more detail, potentially explaining how the feature works, details on the implementation, and/or why the feature is useful.
+## Open a pull request
 
-Make sure you reference any issues that are potentially linked to your Pull Request using GitHub's [keywords](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue), either via comments or commit messages.
+Explain the concrete problem, the resulting behavior, and how you verified it. Link any relevant issue. Describe limits or untested environments, especially for VM, multi-node, or Docker changes. Use a draft pull request while work is incomplete.
 
-WinBoat generally uses the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) naming scheme. You should aim to stick to these conventions whenever possible.
-
-## Review & Merging Process
-
-After you've submitted your changes as a PR, a maintainer may request changes to your code before merging. If everything goes well, your PR will be merged and shipped in the next version of WinBoat.
-
-In case we find issues later on, the PR commits might be reverted and additional discussion will take place in the PR thread or a separate issue.
+Retain the upstream MIT copyright and license notices. Community participation follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security concerns through [SECURITY.md](SECURITY.md).

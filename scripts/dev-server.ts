@@ -1,4 +1,5 @@
 process.env.NODE_ENV = "development";
+delete process.env.ELECTRON_RUN_AS_NODE;
 
 import * as Vite from "vite";
 import ChildProcess, { type ChildProcessWithoutNullStreams } from "child_process";
@@ -44,8 +45,10 @@ async function startElectron() {
     }
 
     const args = [Path.join(__dirname, "..", "build", "main", "main.js"), String(rendererPort)];
+    const electronEnv = { ...process.env };
+    delete electronEnv.ELECTRON_RUN_AS_NODE;
 
-    electronProcess = ChildProcess.spawn(String(Electron), args);
+    electronProcess = ChildProcess.spawn(String(Electron), args, { env: electronEnv });
     electronProcessLocker = false;
 
     electronProcess!.stdout.on("data", data => {

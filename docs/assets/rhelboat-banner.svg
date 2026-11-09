@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="title desc">
+  <title id="title">RHELboat — Enterprise Linux training lab</title>
+  <desc id="desc">Enterprise Linux practice, one command at a time. Guided lessons beside a real container shell.</desc>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0v32" fill="none" stroke="#1d2a34" stroke-width="1"/></pattern>
+    <clipPath id="workspace"><rect x="688" y="58" width="534" height="285" rx="12"/></clipPath>
+  </defs>
+  <rect width="1280" height="400" rx="20" fill="#101820"/>
+  <path d="M656 0h624v400H656Z" fill="url(#grid)"/>
+  <g transform="translate(58 54) scale(.34)">
+    <rect width="256" height="256" rx="56" fill="#172630"/>
+    <path d="M120 57v91H54Z" fill="#f6f3ed"/><path d="M140 76v72h57Z" fill="#e53635"/>
+    <path d="M129 49v106" fill="none" stroke="#f6f3ed" stroke-width="7" stroke-linecap="round"/>
+    <path d="M47 163h162l-24 34H72Z" fill="#e53635"/>
+    <path d="m98 173 9 7-9 7m22 0h18" fill="none" stroke="#f6f3ed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M76 212h35m29 0h35" fill="none" stroke="#7ed4bb" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g font-family="DejaVu Sans, sans-serif">
+    <text x="164" y="108" fill="#f6f3ed" font-size="48" font-weight="700" letter-spacing="-2">RHEL<tspan fill="#9eacae" font-weight="400">boat</tspan></text>
+    <text x="165" y="133" fill="#819497" font-size="10" letter-spacing="2.2">ENTERPRISE LINUX TRAINING LAB</text>
+    <text x="61" y="212" fill="#f6f3ed" font-size="31" font-weight="600" letter-spacing="-.6">Enterprise Linux practice,</text>
+    <text x="61" y="255" fill="#f6f3ed" font-size="31" font-weight="600" letter-spacing="-.6">one command at a time.</text>
+    <circle cx="66" cy="317" r="4" fill="#e53635"/>
+    <text x="80" y="321" fill="#a4b2b6" font-size="10" letter-spacing="1.4">GUIDED LESSONS</text>
+    <circle cx="263" cy="317" r="4" fill="#7ed4bb"/>
+    <text x="277" y="321" fill="#a4b2b6" font-size="10" letter-spacing="1.4">REAL CONTAINER LABS</text>
+  </g>
+  <g clip-path="url(#workspace)">
+    <rect x="688" y="58" width="534" height="285" fill="#16232d"/>
+    <rect x="688" y="58" width="245" height="285" fill="#f6f3ed"/>
+    <rect x="688" y="58" width="534" height="37" fill="#24333e"/>
+    <path d="M933 95v248" stroke="#34444d"/>
+    <g font-family="DejaVu Sans, sans-serif">
+      <circle cx="707" cy="76" r="3" fill="#e53635"/>
+      <text x="719" y="80" fill="#c5d0d0" font-size="9" letter-spacing="1">GUIDED LESSON</text>
+      <circle cx="954" cy="76" r="3" fill="#7ed4bb"/>
+      <text x="966" y="80" fill="#c5d0d0" font-size="9" letter-spacing="1">LAB SHELL</text>
+      <text x="711" y="128" fill="#b53e39" font-size="9" letter-spacing="1.2">01 / ESSENTIAL TOOLS</text>
+      <text x="711" y="157" fill="#24323b" font-size="18" font-weight="700">Create a note.</text>
+      <text x="711" y="183" fill="#76817e" font-size="10">Write a short note.</text>
+      <text x="711" y="201" fill="#76817e" font-size="10">Then read it back in the shell.</text>
+      <rect x="711" y="222" width="198" height="48" rx="5" fill="#eae8df"/>
+      <text x="722" y="243" fill="#52615d" font-size="9" font-family="DejaVu Sans Mono, monospace">printf 'enterprise linux\n'</text>
+      <text x="722" y="258" fill="#52615d" font-size="9" font-family="DejaVu Sans Mono, monospace">&gt; /root/lab/notes.txt</text>
+      <rect x="711" y="293" width="109" height="27" rx="5" fill="#e53635"/>
+      <path d="m722 306 3 3 6-7" fill="none" stroke="#f6f3ed" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="738" y="310" fill="#fff" font-size="9" font-weight="600">Check my work</text>
+    </g>
+    <g font-family="DejaVu Sans Mono, monospace" font-size="10">
+      <text x="952" y="126" fill="#7ed4bb">root@rhelboat:~/lab #</text>
+      <text x="952" y="158" fill="#d3dedc">pwd</text>
+      <text x="952" y="178" fill="#81969c">/root/lab</text>
+      <text x="952" y="213" fill="#d3dedc">cat notes.txt</text>
+      <text x="952" y="233" fill="#f6f3ed">enterprise linux</text>
+      <text x="952" y="270" fill="#7ed4bb">#</text><path d="M970 273h9" stroke="#7ed4bb" stroke-width="2"/>
+    </g>
+    <path d="M933 300h289" stroke="#293b45"/>
+    <circle cx="954" cy="321" r="3" fill="#7ed4bb"/>
+    <text x="965" y="325" fill="#81969c" font-size="8" font-family="DejaVu Sans, sans-serif">UBI 10 · LOCAL WORKSPACE</text>
+  </g>
+  <rect x="688.5" y="58.5" width="533" height="284" rx="12" fill="none" stroke="#34444d"/>
+  <text x="699" y="371" fill="#6f858d" font-size="8" font-family="DejaVu Sans, sans-serif" letter-spacing="1.2">READ THE STEP → RUN THE COMMAND → CHECK THE RESULT</text>
+</svg>

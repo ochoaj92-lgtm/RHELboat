@@ -8,6 +8,7 @@ const config = defineConfig({
     publicDir: "public",
     server: {
         port: 8080,
+        strictPort: true,
     },
     define: {
         "import.meta.env.VITE_APP_VERSION": JSON.stringify(packageJson.version),
@@ -18,20 +19,7 @@ const config = defineConfig({
         emptyOutDir: true,
         chunkSizeWarningLimit: NaN, // Not needed for a desktop app
     },
-    plugins: [
-        vuePlugin({
-            template: {
-                compilerOptions: {
-                    isCustomElement: tag => tag.startsWith("x-"),
-                },
-            },
-        }),
-    ],
-    resolve: {
-        alias: {
-            path: "path-browserify",
-        },
-    },
+    plugins: [vuePlugin()],
 });
 
 export default config;
